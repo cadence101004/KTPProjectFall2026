@@ -19,7 +19,7 @@ export class AudioClock {
   async play(offset = 0): Promise<void> {
     if (!this.buffer) throw new Error('AudioClock.play called before load')
     await this.ctx.resume()
-    this.source?.stop()
+    this.stop()
 
     const source = this.ctx.createBufferSource()
     source.buffer = this.buffer
@@ -34,7 +34,16 @@ export class AudioClock {
 
   // Current position in the song (seconds), read from the audio clock. Slightly negative during START_LEAD.
   songTime(): number {
-    if (!this.source) return 0
+    if (!this.source) return this.startOffset
     return this.ctx.currentTime - this.startedAt + this.startOffset
+  }
+
+  // Stops playback and freezes songTime where the song stopped, so play(songTime()) resumes it.
+  stop(): void {
+    if (!this.source) return
+    this.startOffset = Math.max(0, this.songTime())
+    this.source.stop()
+    this.source.disconnect()
+    this.source = null
   }
 }
