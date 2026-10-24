@@ -15,6 +15,7 @@ export interface GameClip {
   end: number
   difficulty: number
   beatSync?: boolean // duration games that support it: time hazards to the beat. Ignored by task games
+  hits?: number[] // the clip's beat map, in beats from the clip's start. Absent means the game's default pattern
 }
 
 // Game track entries. Never overlap each other.
@@ -41,6 +42,7 @@ export interface Level {
   title: string
   audioHash: string
   bpm: number
+  beatOffset: number // song time of the first beat, in seconds (most songs don't start exactly on a beat)
   countdownRate?: number // manual 321GO speed; absent means auto from bpm
   clips: Clip[]
   media: MediaClip[]

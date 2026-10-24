@@ -23,6 +23,10 @@ interface BaseMeta {
 export interface TaskMeta extends BaseMeta {
   kind: 'task'
   baseBeats: number
+  // Games with discrete hits (press on the beat) set this: the default hits in one cycle, in beats from the
+  // cycle's start, e.g. [1] = one press on the cycle's 2nd beat. Level designers can then edit every hit
+  // per clip (its beat map). Leave it out for games without discrete hits, like scrubbing.
+  defaultHits?: number[]
 }
 
 // Duration games: survive until the clip ends. Free timing unless the game supports beat sync and the clip turns it on.
@@ -30,6 +34,9 @@ export interface DurationMeta extends BaseMeta {
   kind: 'duration'
   minDuration: number // seconds: shortest clip allowed
   canBeatSync: boolean // true if the game can time its hazards to the beat when GameClip.beatSync is on
+  // Beat-synced games set this: default hazard times in one bar (4 beats), in beats from the bar's start.
+  // With beat sync on, the clip's beat map says exactly when each hazard hits.
+  defaultHits?: number[]
 }
 
 export type MiniGameMeta = TaskMeta | DurationMeta
@@ -41,6 +48,9 @@ export interface MiniGameParams {
   reps: number // task games: how many tasks fit in the clip. Duration games: always 1
   bpm: number // the level's tempo; one beat is 60 / bpm seconds
   beatSync: boolean // time things to the beat. Always true for task games; per clip for duration games
+  // The clip's beat map as song times, in order: when to press (task games) or when hazards hit
+  // (beat-synced duration games). Null if the game has no defaultHits, or beat sync is off.
+  hits: number[] | null
   difficulty: number
 }
 

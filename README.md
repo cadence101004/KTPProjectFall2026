@@ -62,19 +62,22 @@ Run locally with `npm install` then `npm run dev`.
 - [ ] Swab the Deck (task)
 
 ### 3. Lives, buffer zones, Game Over
-- [ ] 3 lives, failure costs one life, music keeps playing
-- [ ] Buffer zones show lives and the next prompt
-- [ ] 321GO countdown with "GO" landing on the next game's start, plus a control hint flash
-- [ ] Countdown speed auto-synced to BPM, with a per-level manual override
-- [ ] Game Over screen with Restart Level and Main Menu
+- [x] 3 lives, failure costs one life, music keeps playing
+- [x] Buffer zones show lives and the next prompt
+- [x] 321GO countdown on the beat, plus a control hint flash and a 1 s breather before the game
+- [x] Countdown speed auto-synced to BPM (manual override in the level format; no editor control yet)
+- [x] Game Over screen with Restart Level and Main Menu
 
 ### 4. Timeline editor
-- [ ] MP3 upload and waveform display
-- [ ] Scrub and play from playhead
-- [ ] Drag to move clips, drag edges to resize
-- [ ] Task games snap to `baseDuration` multiples
-- [ ] Beat grid snapping
-- [ ] Save and load levels in IndexedDB
+- [x] MP3 upload and waveform display
+- [x] Scrub and play from playhead
+- [x] Drag to move clips, drag edges to resize
+- [x] Task games snap to whole `baseBeats` cycles
+- [x] Beat grid snapping
+- [x] Save and load levels in IndexedDB
+- [x] Preview viewer: play the level from the playhead in a gameplay view, to see what players will see
+- [x] Per-clip beat maps (osu-style hits, including offbeats)
+- [x] Scrub bar above the waveform
 
 ### 5. Media track (backgrounds)
 - [ ] Image and video clips on their own track behind the minigames
@@ -93,7 +96,7 @@ Run locally with `npm install` then `npm run dev`.
 ### 7. Polish
 - [ ] Latency calibration
 - [ ] Score and end-of-level rank
-- [ ] Practice mode (infinite lives)
+- [x] Practice mode (infinite lives), in the editor preview for now
 - [ ] Undo and redo
 - [ ] In-editor minigame preview
 - [ ] Keyboard, touch, and gamepad input

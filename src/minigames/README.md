@@ -16,8 +16,8 @@ Copy it to `src/minigames/<game_id>/`, using the ID from `MINIGAMES.md` (e.g. `s
 In your copied `index.ts`:
 - Rename the class (e.g. `TemplateTaskGame` to `FireCannonGame`).
 - Set `meta.id` to your folder name, and fill in the rest of `meta` from `MINIGAMES.md`:
-  - Task games: `prompt`, `hint`, `baseBeats`.
-  - Duration games: `prompt`, `hint`, `minDuration` (seconds), and `canBeatSync` (`true` if the spec says Beat sync: optional, `false` if it says no).
+  - Task games: `prompt`, `hint`, `baseBeats`, and `defaultHits` if the spec lists one.
+  - Duration games: `prompt`, `hint`, `minDuration` (seconds), `canBeatSync` (`true` if the spec says Beat sync: optional, `false` if it says no), and `defaultHits` if the spec lists one.
 
 ## 3. Build your game
 
@@ -36,6 +36,11 @@ What's in `params`: `scene` (draw here), `startTime` (song time your clip starts
 
 One beat lasts `60 / params.bpm` seconds. Use it to put cues and animations on the beat.
 
+**Beat maps (`params.hits`):** if your game has discrete moments, like "press on the beat" or "a slam lands now", give `meta` a `defaultHits` pattern (beats from the start of one cycle; for duration games, one 4-beat bar). Level designers can then add, remove, or move every hit in the editor, osu-style, including offbeats. Your game gets the result as `params.hits`: song times, in order.
+- **Task games:** judge each press with `judgePress` from `src/minigames/shared/judgePress.ts`, so every rhythm game has the same timing feel. A press within ±`HIT_WINDOW` (0.16 s) of the hit counts. Pressing too early (in the run-up to a hit) or letting the window pass fails the game. The task template shows how, with an approach ring.
+- **Beat-synced duration games:** make each hazard land at a time in `params.hits`.
+- `params.hits` is `null` when your game has no `defaultHits` (e.g. Swab the Deck) or beat sync is off, so fall back to your own timing.
+
 **Beat sync for duration games:** if your game has `canBeatSync: true`, check `params.beatSync` in `start()`. When it's `true`, time your hazards to the beat. When it's `false`, use your own timing. The duration template shows a simple example. Task games are always on the beat, and `params.beatSync` is always `true` for them.
 
 ## 4. The rules (please read)
@@ -44,9 +49,10 @@ One beat lasts `60 / params.bpm` seconds. Use it to put cues and animations on t
 2. **Never end early.** If the player wins before the clip is over, set `'won'` and keep showing a victory state until `destroy()` is called. The level has to stay in sync with the music.
 3. **`'failed'` is final.** Once a game has failed, it stays failed. The engine takes away a life, and the music keeps going.
 4. **Clean up.** Add every game object you create to `this.objects` so `destroy()` removes it. Anything left behind will show up in the next minigame.
-5. **Size things relative to the screen.** Use `params.scene.scale.width` and `height`, not fixed pixel positions.
+5. **Text uses the game font (Pixelify Sans).** Phaser draws text onto a canvas where page CSS doesn't reach, so create text with `textStyle` from `src/minigames/shared/font.ts`: `scene.add.text(x, y, 'FIRE!', textStyle(24, { color: '#ffcc4d' }))`.
+6. **Size things relative to the screen.** Use `params.scene.scale.width` and `height`, not fixed pixel positions.
 6. **Use the abstract buttons.** Listen for `'left'`, `'right'`, `'up'`, `'down'`, `'action'`, or pointer input (`x`, `y` from 0 to 1). Never read the keyboard directly, so touch and gamepad work for free.
-7. **Never import from another minigame or from `src/engine/`.** Only import types from `src/types/minigame.ts`.
+7. **Never import from another minigame or from `src/engine/`.** Import types from `src/types/minigame.ts` and shared helpers from `src/minigames/shared/` only.
 
 ## 5. Art and sound
 

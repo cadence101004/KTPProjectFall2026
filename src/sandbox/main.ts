@@ -2,9 +2,10 @@ import Phaser from 'phaser'
 import '../style.css'
 import './sandbox.css'
 import { listenForKeys } from '../engine/input'
+import { allGames } from '../minigames/allGames'
+import { loadGameFont } from '../minigames/shared/font'
 import { MetronomeClock } from './MetronomeClock'
 import { SandboxScene } from './SandboxScene'
-import { sandboxGames } from './sandboxGames'
 
 // Minigame sandbox: play any one minigame on its own, with a metronome standing in for the song.
 const app = document.querySelector<HTMLDivElement>('#app')!
@@ -12,7 +13,7 @@ app.innerHTML = `
   <div class="sandbox">
     <h1>Minigame sandbox</h1>
     <div class="controls">
-      <label>Game <select id="game">${Object.keys(sandboxGames).map(id => `<option>${id}</option>`).join('')}</select></label>
+      <label>Game <select id="game">${Object.keys(allGames).map(id => `<option>${id}</option>`).join('')}</select></label>
       <label>BPM <input id="bpm" type="number" min="40" max="300" value="120" /></label>
       <label>Length (s) <input id="length" type="number" min="1" max="60" step="0.5" value="8" /></label>
       <label>Difficulty <input id="difficulty" type="number" min="1" max="5" value="1" /></label>
@@ -27,16 +28,20 @@ const $ = <T extends HTMLElement>(id: string) => app.querySelector<T>('#' + id)!
 const clock = new MetronomeClock()
 const scene = new SandboxScene(clock)
 
-new Phaser.Game({
-  type: Phaser.AUTO,
-  parent: 'stage',
-  width: 480,
-  height: 270,
-  backgroundColor: '#123047',
-  pixelArt: true,
-  scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-  scene: [scene],
-})
+// Phaser starts once the game font is ready, so its text never gets stuck in a fallback font.
+void loadGameFont().then(
+  () =>
+    new Phaser.Game({
+      type: Phaser.AUTO,
+      parent: 'stage',
+      width: 480,
+      height: 270,
+      backgroundColor: '#123047',
+      pixelArt: true,
+      scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+      scene: [scene],
+    }),
+)
 
 listenForKeys(clock, input => scene.send(input))
 

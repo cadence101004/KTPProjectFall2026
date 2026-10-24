@@ -1,8 +1,9 @@
-# PirateWare Minigames
+﻿# PirateWare Minigames
 
 Every minigame we plan to build. Claim one by putting your name in **Owner**, then follow [`src/minigames/README.md`](src/minigames/README.md).
 
 - **Task** games: one task per cycle of `baseBeats`, repeated as many times as fit in the clip. Always on the beat, so the same game gets faster on a faster song. Missing any task fails the game.
+- **Default hits** (beat map): games with discrete hits list their default pattern, in beats from the start of one cycle (task) or one 4-beat bar (duration, beat sync on). Level designers can then edit every hit per clip, osu-style. Beat 0 is the first beat, so `[1]` means the 2nd beat.
 - **Duration** games: survive until the clip ends. `minDuration` (seconds) is the shortest clip allowed. Timing is free by default. Games with **Beat sync: optional** have a beat-synced version that the level creator can turn on per clip. Games with **Beat sync: no** never sync.
 
 ## Tracker
@@ -30,7 +31,7 @@ Priority 1 games cover every case the engine has to handle, so build those first
 
 ### Fire the Cannon (`fire_cannon`)
 - **Prompt / hint:** `FIRE!` / `SPACE`
-- **baseBeats:** 2
+- **baseBeats:** 2. **Default hits:** `[1]` (fire on the 2nd beat)
 - **Mechanic:** A fuse burns toward a mark. Press `action` exactly when it reaches the mark, which lands on the second beat of each cycle.
 - **Win a rep:** press within the hit window around the beat. **Fail:** pressing too early, too late, or not at all.
 - **Difficulty:** a narrower hit window, and a fuse that's harder to read (faster at the end).
@@ -38,7 +39,7 @@ Priority 1 games cover every case the engine has to handle, so build those first
 
 ### Swab the Deck (`swab_the_deck`)
 - **Prompt / hint:** `SWAB!` / `MOUSE`
-- **baseBeats:** 4
+- **baseBeats:** 4. **Default hits:** none (no discrete hits, so it uses cycle windows)
 - **Mechanic:** Grime spots appear on the deck. Drag the pointer over each one to scrub it clean.
 - **Win a rep:** every spot is clean before the cycle ends. **Fail:** any spot is left dirty.
 - **Difficulty:** more spots, smaller spots, and spots that need more scrubbing.
@@ -46,7 +47,7 @@ Priority 1 games cover every case the engine has to handle, so build those first
 
 ### Patch the Hull (`patch_the_hull`)
 - **Prompt / hint:** `PATCH!` / `MOUSE`
-- **baseBeats:** 2
+- **baseBeats:** 2. **Default hits:** `[0]` (a leak springs on each cycle's first beat)
 - **Mechanic:** Whack-a-mole. A leak springs on a beat, and you click it to plug it.
 - **Win a rep:** plug the leak before the cycle ends. **Fail:** the leak is still open when the cycle ends.
 - **Difficulty:** two or three leaks per cycle, and leaks that move.
@@ -54,7 +55,7 @@ Priority 1 games cover every case the engine has to handle, so build those first
 
 ### Parrot Says (`parrot_says`)
 - **Prompt / hint:** `REPEAT!` / `ARROWS`
-- **baseBeats:** 8
+- **baseBeats:** 8. **Default hits:** `[4, 5, 6, 7]` (the player's four answers)
 - **Mechanic:** On beats 1 to 4 the parrot squawks four arrows. On beats 5 to 8 the player repeats them.
 - **Win a rep:** the whole sequence is correct. **Fail:** any wrong arrow or a missed arrow.
 - **Difficulty:** repeats on the beat are required (not just in the right order), and the sequences get trickier.
@@ -62,7 +63,7 @@ Priority 1 games cover every case the engine has to handle, so build those first
 
 ### Parry! (`parry`)
 - **Prompt / hint:** `PARRY!` / `ARROWS`
-- **baseBeats:** 2
+- **baseBeats:** 2. **Default hits:** `[1]` (block on the strike)
 - **Mechanic:** A rival pirate winds up on beat 1, showing the direction of the strike, and strikes on beat 2. Press that direction on beat 2 to block.
 - **Win a rep:** the right direction within the hit window. **Fail:** the wrong direction, or bad timing.
 - **Difficulty:** a shorter wind-up tell, and feints.
@@ -70,14 +71,14 @@ Priority 1 games cover every case the engine has to handle, so build those first
 
 ### Hoist the Colors (`hoist_the_colors`), idea
 - **Prompt / hint:** `HOIST!` / `UP`
-- **baseBeats:** 4
+- **baseBeats:** 4. **Default hits:** `[0, 1, 2, 3]`
 - **Mechanic:** Press `up` on each of the 4 beats to haul the flag up the mast one notch at a time.
 - **Win a rep:** all 4 pulls on the beat. **Fail:** a missed or off-beat pull drops the flag.
 - **Art:** mast, flag, rope.
 
 ### Spyglass (`spyglass`), idea
 - **Prompt / hint:** `LAND HO!` / `SPACE`
-- **baseBeats:** 2
+- **baseBeats:** 2. **Default hits:** `[1]`
 - **Mechanic:** The spyglass view sweeps across the horizon. Press `action` when the island is centered, which happens on the beat.
 - **Win a rep:** press while the island is in the center zone. **Fail:** pressing on open sea, or not at all.
 - **Art:** spyglass vignette, horizon, island, sea monsters as decoys.
@@ -87,8 +88,8 @@ Priority 1 games cover every case the engine has to handle, so build those first
 ## Duration games
 
 ### Dodge the Kraken (`dodge_kraken`)
-- **Prompt / hint:** `DODGE!` / `← →`
-- **minDuration:** 4 s. **Beat sync:** optional
+- **Prompt / hint:** `DODGE!` / `â† â†’`
+- **minDuration:** 4 s. **Beat sync:** optional. **Default hits:** `[0, 2]` (slams on beats 1 and 3 of each bar)
 - **Mechanic:** The deck is split into 3 lanes. A tentacle shadow appears over a lane, then slams down. Move left and right to stay out of it.
 - **Beat sync on:** the shadow appears one beat early and the slam lands on the beat. **Off:** slams come at their own varied pace.
 - **Fail:** getting hit by a slam. **Win:** surviving to the end of the clip.
@@ -96,8 +97,8 @@ Priority 1 games cover every case the engine has to handle, so build those first
 - **Art:** deck, pirate (use `idle_character` / `jumping_character`), tentacle, shadow.
 
 ### Walk the Plank (`walk_the_plank`)
-- **Prompt / hint:** `BALANCE!` / `← →`
-- **minDuration:** 4 s. **Beat sync:** optional
+- **Prompt / hint:** `BALANCE!` / `â† â†’`
+- **minDuration:** 4 s. **Beat sync:** optional. **Default hits:** `[0]` (a gust each bar)
 - **Mechanic:** A balance meter drifts, and gusts of wind shove it. Press left and right to keep it centered.
 - **Beat sync on:** gusts hit on the beat. **Off:** gusts come at random.
 - **Fail:** the meter hits either end. **Win:** surviving to the end of the clip.
@@ -105,16 +106,16 @@ Priority 1 games cover every case the engine has to handle, so build those first
 - **Art:** plank, pirate wobbling, sharks below, meter.
 
 ### Steer Through the Rocks (`steer_the_rocks`), idea
-- **Prompt / hint:** `STEER!` / `← →`
-- **minDuration:** 4 s. **Beat sync:** optional
+- **Prompt / hint:** `STEER!` / `â† â†’`
+- **minDuration:** 4 s. **Beat sync:** optional. **Default hits:** `[0, 1, 2, 3]` (a row of rocks each beat)
 - **Mechanic:** A top-down ship moves forward automatically, and rocks scroll toward it. Steer left and right.
 - **Beat sync on:** a new row of rocks arrives on each beat. **Off:** rocks are spaced at random.
 - **Fail:** hitting a rock. **Win:** surviving to the end of the clip.
 - **Art:** ship (top-down), rocks, water tiles (`floortiles/water.png`, `shoreline.png`).
 
 ### Cannonball Barrage (`cannonball_barrage`), idea
-- **Prompt / hint:** `DUCK!` / `↑ ↓`
-- **minDuration:** 4 s. **Beat sync:** optional
+- **Prompt / hint:** `DUCK!` / `â†‘ â†“`
+- **minDuration:** 4 s. **Beat sync:** optional. **Default hits:** `[0, 2]`
 - **Mechanic:** Cannonballs fly in high or low. Hold `up` to jump or `down` to duck.
 - **Beat sync on:** each cannonball arrives on a beat. **Off:** they come at random.
 - **Fail:** getting hit. **Win:** surviving to the end of the clip.

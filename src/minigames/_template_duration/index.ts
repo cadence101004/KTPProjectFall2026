@@ -13,6 +13,7 @@ export class TemplateDurationGame implements MiniGame {
     hint: '← →',
     minDuration: 4, // shortest clip this game allows, in seconds
     canBeatSync: true, // set false if your game has no beat-synced version
+    defaultHits: [0, 2], // beat sync on: hazards on beats 1 and 3 of each bar. Level designers can edit every hit
   }
 
   private params!: MiniGameParams
@@ -51,11 +52,13 @@ export class TemplateDurationGame implements MiniGame {
     this.player.x = this.params.scene.scale.width * Math.min(1, Math.max(0, this.x))
     this.player.fillColor = this.result === 'failed' ? 0xff4d4d : 0xffcc4d
 
-    // Beat-synced version: here the player just pulses on each beat. In a real game, time your hazards this way.
-    if (this.params.beatSync) {
-      const beatLength = 60 / this.params.bpm
-      const beatPhase = ((songTime - this.params.startTime) / beatLength) % 1
-      this.player.setScale(1 + 0.3 * (1 - beatPhase))
+    // Beat-synced version: params.hits lists when each hazard lands (the clip's beat map). Here the player
+    // just pulses on each hit; in a real game, a slam or cannonball arrives at each of these times.
+    const hits = this.params.hits
+    if (hits) {
+      const lastHit = hits.findLast(hit => hit <= songTime)
+      const sinceHit = lastHit === undefined ? Infinity : songTime - lastHit
+      this.player.setScale(1 + 0.5 * Math.max(0, 1 - sinceHit / 0.25))
     }
   }
 

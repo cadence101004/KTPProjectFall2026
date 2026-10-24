@@ -38,14 +38,14 @@ Think of each level like an osu! map: the song and how the map is charted set th
 Defined in `src/types/minigame.ts` (that file is the source of truth). In short:
 
 ```ts
-// MiniGameMeta = TaskMeta | DurationMeta, all with id, prompt, hint
-interface TaskMeta     { kind: "task"; baseBeats: number }                             // one task per cycle, always on the beat
-interface DurationMeta { kind: "duration"; minDuration: number; canBeatSync: boolean } // seconds; free timing unless synced
+// MiniGameMeta = TaskMeta | DurationMeta, all with id, prompt, hint, and optional defaultHits
+interface TaskMeta     { kind: "task"; baseBeats: number; defaultHits?: number[] }                             // hits: beats in one cycle
+interface DurationMeta { kind: "duration"; minDuration: number; canBeatSync: boolean; defaultHits?: number[] } // hits: beats in one bar
 
 interface MiniGame {
   meta: MiniGameMeta;
   preload?(load: Phaser.Loader.LoaderPlugin): void;  // called once at boot
-  start(params: { scene: Phaser.Scene; startTime: number; duration: number; reps: number; bpm: number; beatSync: boolean; difficulty: number }): void;
+  start(params: { scene: Phaser.Scene; startTime: number; duration: number; reps: number; bpm: number; beatSync: boolean; hits: number[] | null; difficulty: number }): void;
   update(songTime: number): void;
   handleInput(input: GameInput): void;  // buttons (left/right/up/down/action) or pointer (x, y in 0..1), stamped with songTime
   status(): "running" | "won" | "failed";
@@ -59,6 +59,7 @@ One beat is `60 / bpm` seconds.
 
 - **Duration games** (survive until the end): `duration = clip.end - clip.start`. Must be at least `minDuration` seconds. Failing at any point loses a life; reaching the clip end is a win. Timing is free unless the game has `canBeatSync` and the clip sets `beatSync: true`; then hazards follow the beat. Not every survival game supports sync.
 - **Task games** (complete N tasks, always on the beat, osu-style): clip length snaps to whole multiples of `baseBeats` beats. `reps = repsFor(meta, clipLength, bpm)` in `src/engine/clipRules.ts`, minimum 1. Each rep gets an equal `duration / reps` window and must be completed within it.
+- **Beat maps** (osu-style): games with discrete hits declare `defaultHits`. Each game clip may store `hits` (beats from the clip start) to override the default, editable per hit in the editor, including offbeats. `hitTimes` in `src/engine/clipRules.ts` turns them into song times for `params.hits`. Task games press on each hit; beat-synced duration games land hazards on each hit; `params.hits` is null for games without `defaultHits` or with beat sync off.
 - At clip end the engine calls `update(clip.end)` one last time, then reads `status()`, then calls `destroy()`. That last update lets a task game see its final window close.
 
 Templates, rules for minigame authors, and the registry live in `src/minigames/` (see its README.md).
@@ -70,10 +71,11 @@ Templates, rules for minigame authors, and the registry live in `src/minigames/`
   "title": "Kraken's Lullaby",
   "audioHash": "sha256-of-the-mp3",
   "bpm": 128,
+  "beatOffset": 0.12,
   "countdownRate": 1.25,
   "clips": [
     { "type": "buffer", "start": 0.0, "end": 4.0 },
-    { "type": "game", "gameId": "fire_cannon", "start": 4.0, "end": 7.75, "difficulty": 1 },
+    { "type": "game", "gameId": "fire_cannon", "start": 4.0, "end": 7.75, "difficulty": 1, "hits": [1, 1.5, 3, 5] },
     { "type": "game", "gameId": "dodge_kraken", "start": 7.75, "end": 12.0, "difficulty": 1, "beatSync": true },
     { "type": "buffer", "start": 7.75, "end": 9.5 }
   ],
@@ -99,7 +101,7 @@ Templates, rules for minigame authors, and the registry live in `src/minigames/`
 
 - Before every game clip, `public/assets/audio/321GO_sfx.mp3` plays near the end of the preceding buffer, scheduled on the AudioClock's context so **"GO" lands exactly on the game clip's `start`**. The upcoming game's control hint flashes with it.
 - Speed is set with `AudioBufferSourceNode.playbackRate` (pitch rises with speed; that is intended).
-- Auto rate from BPM: `rate = SFX_BEAT_INTERVAL / (60 / bpm)`, where `SFX_BEAT_INTERVAL` is the measured gap between "3" and "2" in the sfx file. This puts each count on a song beat.
+- Auto rate from BPM: `rate = countSpacing / (60 / bpm)`, so each count lands on a song beat. The four count times inside the file are detected on load (`findOnsets` in `src/audio/onsets.ts`, then `countdownBeats`), so swapping in a different countdown sound needs no code change. Planning lives in `src/engine/countdown.ts`.
 - Manual override: the level's optional `countdownRate` replaces the auto rate. Absent means auto.
 - If a buffer is shorter than the countdown at that rate, the editor warns and the countdown starts with the buffer (GO still lands on the clip start).
 
@@ -140,7 +142,7 @@ The full list, specs, and owners are in `MINIGAMES.md` (source of truth). Build 
 1. **Audio clock + level runner**: load an MP3, play it, report song time, and step through a hardcoded level JSON, switching clips at the right times.
 2. **Minigame contract + first 3 minigames**.
 3. **Lives system, buffer zones, Game Over flow** (Restart Level / Main Menu).
-4. **Timeline editor**: MP3 upload, waveform, scrub/play from playhead, drag to move clips, drag edges to resize (task games snap to `baseDuration` multiples), beat-grid snapping, save/load levels to IndexedDB.
+4. **Timeline editor**: MP3 upload, waveform, scrub/play from playhead, drag to move clips, drag edges to resize (task games snap to whole `baseBeats` cycles), beat-grid snapping, save/load levels to IndexedDB, and a **preview viewer** that plays the level from the playhead in the real gameplay view (same runtime as the game, not a mock-up) so designers see exactly what players will see.
 5. **Media track**: background images and video behind minigames, frosted cover effects, video synced to the audio clock, and a media track in the editor.
 6. **Level packs**: export and import `.pwlevel` zips (see Level packs above).
 7. **Polish**: latency calibration, score and end-of-level rank, practice mode (infinite lives), undo/redo, in-editor minigame preview, keyboard + touch + gamepad input.
@@ -167,4 +169,8 @@ src/
 
 ## Current status
 
-Build step 1 done: `AudioClock`, level types, `LevelRunner` (update, seek) with Vitest tests, and a debug page (`src/debug/DebugPage.ts`) that main.ts mounts for now. Build step 2 in progress: `MiniGame` contract (`src/types/minigame.ts`), `repsFor`, keyboard input mapping, minigame templates and registry, `MINIGAMES.md`, and the minigame sandbox are done. A teammate is building the minigames themselves from `MINIGAMES.md`. Next for us: the timeline editor (build step 4).
+Build step 1 done: `AudioClock`, level types, `LevelRunner` (update, seek) with Vitest tests, and a debug page (`src/debug/DebugPage.ts`) that main.ts mounts for now. Build step 2 in progress: `MiniGame` contract (`src/types/minigame.ts`), `repsFor`, keyboard input mapping, minigame templates and registry, `MINIGAMES.md`, and the minigame sandbox are done. A teammate is building the minigames themselves from `MINIGAMES.md`.
+
+Build step 4 mostly done: editor at `/editor.html` with waveform, scrub bar, clips (move, resize, snap), beat grid, per-clip beat maps (osu-style hits), save/load in IndexedDB, and a preview viewer that runs the real `LevelScene` (`src/engine/LevelScene.ts`: clips, buffers, lives, 321GO countdown with a 1 s breather before each minigame). `index.html` is a home menu linking to the editor, sandbox, and debug pages; Play is disabled until the level player has its own page.
+
+Next: Game Over screen (Restart Level / Main Menu) and a practice (infinite lives) toggle for previews, then a Play page with level select.

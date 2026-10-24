@@ -1,8 +1,10 @@
 import Phaser from 'phaser'
-import { repsFor } from '../engine/clipRules'
+import { hitTimes, repsFor } from '../engine/clipRules'
+import { allGames } from '../minigames/allGames'
+import { textStyle } from '../minigames/shared/font'
+import type { GameClip } from '../types/level'
 import type { GameInput, MiniGame, MiniGameParams } from '../types/minigame'
 import type { MetronomeClock } from './MetronomeClock'
-import { sandboxGames } from './sandboxGames'
 
 const COUNT_IN_BEATS = 4 // one bar of clicks before the clip starts
 
@@ -29,11 +31,11 @@ export class SandboxScene extends Phaser.Scene {
   }
 
   preload(): void {
-    for (const make of Object.values(sandboxGames)) make().preload?.(this.load)
+    for (const make of Object.values(allGames)) make().preload?.(this.load)
   }
 
   create(): void {
-    this.hud = this.add.text(8, 8, 'Pick a game and press Start', { fontSize: '12px' }).setDepth(1000)
+    this.hud = this.add.text(8, 8, 'Pick a game and press Start', textStyle(12)).setDepth(1000)
     for (const phase of ['down', 'move', 'up'] as const) {
       this.input.on(`pointer${phase}`, (pointer: Phaser.Input.Pointer) => {
         const x = Phaser.Math.Clamp(pointer.x / this.scale.width, 0, 1)
@@ -48,7 +50,7 @@ export class SandboxScene extends Phaser.Scene {
     this.current?.destroy()
     this.current = null
 
-    const game = sandboxGames[run.id]()
+    const game = allGames[run.id]()
     const meta = game.meta
     const beatLength = 60 / run.bpm
     const duration =
@@ -56,6 +58,16 @@ export class SandboxScene extends Phaser.Scene {
         ? repsFor(meta, run.length, run.bpm) * meta.baseBeats * beatLength
         : Math.max(run.length, meta.minDuration)
     const startTime = COUNT_IN_BEATS * beatLength
+
+    // The sandbox plays each game with its default beat map, exactly as a fresh clip in the editor would.
+    const clip: GameClip = {
+      type: 'game',
+      gameId: run.id,
+      start: startTime,
+      end: startTime + duration,
+      difficulty: run.difficulty,
+      beatSync: run.beatSync,
+    }
 
     await this.clock.start(run.bpm)
     this.params = {
@@ -65,6 +77,7 @@ export class SandboxScene extends Phaser.Scene {
       reps: repsFor(meta, duration, run.bpm),
       bpm: run.bpm,
       beatSync: meta.kind === 'task' || (run.beatSync && meta.canBeatSync),
+      hits: hitTimes(meta, clip, run.bpm),
       difficulty: run.difficulty,
     }
     this.endTime = startTime + duration

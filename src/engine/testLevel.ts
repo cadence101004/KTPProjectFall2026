@@ -5,6 +5,7 @@ export const testLevel: Level = {
   title: 'Test Voyage',
   audioHash: '',
   bpm: 120,
+  beatOffset: 0,
   clips: [
     { type: 'buffer', start: 0, end: 4 },
     { type: 'game', gameId: 'fire_cannon', start: 4, end: 8, difficulty: 1 },

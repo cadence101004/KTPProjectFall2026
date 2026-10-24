@@ -1,0 +1,53 @@
+.home {
+  width: min(480px, calc(100% - 32px));
+  text-align: center;
+}
+
+.home h1 {
+  margin: 0;
+  font-size: clamp(2.5rem, 8vw, 4rem);
+  color: #ffcc4d;
+  letter-spacing: 0.04em;
+}
+
+.home .tagline {
+  margin: 4px 0 28px;
+  opacity: 0.75;
+}
+
+.home .menu {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.home .item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 18px;
+  border: 1px solid #2c5373;
+  border-radius: 8px;
+  background: #11283b;
+  color: inherit;
+  text-decoration: none;
+  text-align: left;
+}
+
+.home a.item:hover,
+.home a.item:focus-visible {
+  border-color: #ffcc4d;
+  background: #16334b;
+}
+
+.home .item b {
+  font-size: 1.15rem;
+}
+
+.home .item small {
+  opacity: 0.7;
+}
+
+.home .item.disabled {
+  opacity: 0.45;
+}
