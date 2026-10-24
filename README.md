@@ -1,18 +1,19 @@
-# Treasure Adventure
+# PirateWare
 
-A 2D pixel-art treasure adventure game featuring exploration, platforming, and interactive challenges. Players control a pirate girl as she navigates different environments, collects items, and completes challenges along the way.
+A WarioWare-style pirate rhythm game. Players survive a rapid-fire sequence of pirate minigames synced to music, with only 3 lives to spare. A built-in timeline editor lets anyone upload their own song, lay out minigames and breather zones like clips in a video editor, and share the result as a single downloadable level pack.
 
 ## Overview
 
-This project combines game development, character animation, and pixel-art design to create a fun, interactive pirate-themed experience. The game features a retro-inspired art style with simple animations and colorful environments.
+Every level is a song. Each minigame is a clip on that song's timeline, so prompts land on the beat and the action speeds up and slows down with the music. Fail a minigame and you lose a life, but the music never stops. Lose all three and it's Game Over.
 
 ## Planned Features
 
-- **Player Movement:** Walking, running, jumping, and falling animations.
-- **Combat:** Basic attack animations and interactions with obstacles.
-- **Mini-game interaction:** Playable mini-games like Mario Party. 
-- **Environment:** Beach-themed obstacles and props, including barrels, cannons, and cannonballs.
-- **Exploration:** Different tiles containing unique mini-games or interactions. 
+- **Rhythm minigames:** Fire the Cannon, Dodge the Kraken, Swab the Deck, and more, each timed to the song.
+- **Lives and buffer zones:** 3 lives, with short breather zones between games that show lives left and the next prompt.
+- **Timeline editor:** Upload an MP3, see its waveform, and drag, resize, and snap minigame clips to the beat.
+- **Background media:** Put images or video on the timeline behind the minigames, with a frosted blur-and-dim cover so the action stays readable. Set a level to an anime intro and play over the actual opening.
+- **Level packs:** Download a level as one `.pwlevel` file (a zip) and load it with a single click or drag-and-drop. A pack holds the timeline, any custom minigames, and optionally the song and background media.
+- **Custom minigames:** Reskin and retune built-in minigame templates with your own sprites and settings, packed right into the level.
 
 ## Art and Design
 
@@ -20,20 +21,83 @@ The game uses a hand-drawn pixel-art style inspired by classic 2D games.
 
 Character sprites and environmental assets are designed using **Piskel**.
 
+## Project Layout
 
-## Development
+```
+public/assets/sprites/   Character, floor tile, and cursor art (Piskel exports)
+src/
+  main.ts                Entry point
+  audio/                 Audio clock, MP3 loading, hashing
+  engine/                Level runner, lives, buffer zones, game over
+  minigames/             One folder per minigame
+  editor/                Timeline editor UI
+  storage/               IndexedDB helpers, level pack import and export
+  types/                 Shared types (MiniGame, Level, Clip)
+```
 
-**Project Status:** In Development
+Run locally with `npm install` then `npm run dev`.
 
-The team is currently planning gameplay mechanics, creating character sprites, and designing environmental assets.
+## Objectives Checklist
 
-## Future Improvements
+### 0. Setup
+- [x] Vite + TypeScript project scaffolded
+- [x] Sprites moved into `public/assets/sprites`
+- [x] Source folders created
+- [ ] Confirm Phaser version (installed: Phaser 4)
 
-- Expand the playable environments.
-- Add more complicated interactive puzzles and obstacles.
-- Implement additional character animations.
-- Introduce sound effects and background music.
-- Refine the overall gameplay experience.
+### 1. Audio clock + level runner
+- [ ] `AudioClock`: load an uploaded MP3 and play it
+- [ ] `AudioClock`: report accurate song time from `AudioContext.currentTime`
+- [ ] Level and Clip types
+- [ ] Hardcoded test level JSON
+- [ ] `LevelRunner`: switch clips at the right song times
+
+### 2. Minigame contract + first 3 minigames
+- [ ] `MiniGame` interface and metadata types
+- [ ] Fire the Cannon (task)
+- [ ] Dodge the Kraken (duration)
+- [ ] Swab the Deck (task)
+
+### 3. Lives, buffer zones, Game Over
+- [ ] 3 lives, failure costs one life, music keeps playing
+- [ ] Buffer zones show lives and the next prompt
+- [ ] Game Over screen with Restart Level and Main Menu
+
+### 4. Timeline editor
+- [ ] MP3 upload and waveform display
+- [ ] Scrub and play from playhead
+- [ ] Drag to move clips, drag edges to resize
+- [ ] Task games snap to `baseDuration` multiples
+- [ ] Beat grid snapping
+- [ ] Save and load levels in IndexedDB
+
+### 5. Media track (backgrounds)
+- [ ] Image and video clips on their own track behind the minigames
+- [ ] Frosted cover effect (blur + dim) per media clip
+- [ ] Video playback synced to the audio clock (muted, drift-corrected)
+- [ ] Media track in the editor: add, move, resize, set effects
+- [ ] Missing or broken media falls back to the default background
+
+### 6. Level packs (sharing)
+- [ ] Export a level as a `.pwlevel` zip (level JSON, custom minigames, optional MP3 and media)
+- [ ] Import a `.pwlevel` by file picker or drag-and-drop
+- [ ] Validate the pack (manifest version, clip overlaps, known minigame templates)
+- [ ] If the pack has no audio or media, prompt for the files and warn on hash mismatch
+- [ ] Custom minigames: template ID + JSON config + sprites, no code
+
+### 7. Polish
+- [ ] Latency calibration
+- [ ] Score and end-of-level rank
+- [ ] Practice mode (infinite lives)
+- [ ] Undo and redo
+- [ ] In-editor minigame preview
+- [ ] Keyboard, touch, and gamepad input
+
+### Stretch minigames
+- [ ] Patch the Hull
+- [ ] Walk the Plank
+- [ ] Parrot Says
+- [ ] Parry!
 
 ## Team
 
