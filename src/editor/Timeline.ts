@@ -8,6 +8,7 @@ export interface ClipView {
   label: string
   color: string
   selected: boolean
+  hits: number[] // beat map dots, as fractions (0..1) of the way through the clip
 }
 
 // The editor's waveform strip. wavesurfer only draws; playback always goes through AudioClock,
@@ -17,9 +18,22 @@ export class Timeline {
   private readonly regions: ReturnType<typeof RegionsPlugin.create>
   private readonly playhead: HTMLDivElement
   private readonly grid: HTMLDivElement
+  private readonly rulerTrack: HTMLDivElement // scrolls and zooms with the waveform
+  private readonly knob: HTMLDivElement
   private duration = 0
 
   constructor(container: HTMLElement) {
+    // Scrub bar above the waveform. Normal page DOM (outside wavesurfer), so editor.css styles it.
+    const ruler = document.createElement('div')
+    ruler.className = 'ruler'
+    this.rulerTrack = document.createElement('div')
+    this.rulerTrack.className = 'ruler-track'
+    this.knob = document.createElement('div')
+    this.knob.className = 'ruler-knob'
+    this.rulerTrack.append(this.knob)
+    ruler.append(this.rulerTrack)
+    container.before(ruler)
+
     this.waves = WaveSurfer.create({
       container,
       height: 120,
@@ -74,10 +88,40 @@ export class Timeline {
     )
   }
 
-  // Moves the playhead line. The wrapper is the full zoomed waveform, so the line scrolls with it.
+  // Moves the playhead line and the scrub knob. Called every frame, so it also keeps the scrub bar
+  // lined up with the waveform's current zoom and scroll.
   setPlayhead(time: number): void {
     if (this.duration === 0) return
-    this.playhead.style.left = `${(time / this.duration) * 100}%`
+    const position = `${(time / this.duration) * 100}%`
+    this.playhead.style.left = position
+    this.knob.style.left = position
+    this.rulerTrack.style.width = `${this.waves.getWrapper().offsetWidth}px`
+    this.rulerTrack.style.transform = `translateX(${-this.waves.getScroll()}px)`
+  }
+
+  // Dragging on the scrub bar. Calls back with the time under the pointer when the drag starts, as it
+  // moves, and when it's released.
+  onScrub(callback: (time: number, phase: 'start' | 'move' | 'end') => void): void {
+    const ruler = this.rulerTrack.parentElement!
+    const timeAt = (event: PointerEvent) => {
+      const rect = this.rulerTrack.getBoundingClientRect()
+      return Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width)) * this.duration
+    }
+    let dragging = false
+    ruler.addEventListener('pointerdown', event => {
+      if (this.duration === 0) return
+      dragging = true
+      ruler.setPointerCapture(event.pointerId)
+      callback(timeAt(event), 'start')
+    })
+    ruler.addEventListener('pointermove', event => {
+      if (dragging) callback(timeAt(event), 'move')
+    })
+    ruler.addEventListener('pointerup', event => {
+      if (!dragging) return
+      dragging = false
+      callback(timeAt(event), 'end')
+    })
   }
 
   // Calls back with the song time the user clicked or dragged to on the waveform.
@@ -121,8 +165,12 @@ export class Timeline {
   }
 }
 
-// A clip's name tag. Styled inline for the same shadow DOM reason as the playhead.
+// A clip's name tag plus a dot for each beat map hit along its bottom edge. Styled inline for the same
+// shadow DOM reason as the playhead.
 function clipLabel(clip: ClipView): HTMLElement {
+  const content = document.createElement('div')
+  Object.assign(content.style, { position: 'relative', height: '100%', pointerEvents: 'none' })
+
   const label = document.createElement('div')
   label.textContent = clip.label
   Object.assign(label.style, {
@@ -132,8 +180,23 @@ function clipLabel(clip: ClipView): HTMLElement {
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
-    pointerEvents: 'none',
     borderTop: clip.selected ? '3px solid #ffcc4d' : '3px solid transparent',
   })
-  return label
+  content.append(label)
+
+  for (const hit of clip.hits) {
+    const dot = document.createElement('div')
+    Object.assign(dot.style, {
+      position: 'absolute',
+      bottom: '6px',
+      left: `${hit * 100}%`,
+      width: '6px',
+      height: '6px',
+      marginLeft: '-3px',
+      borderRadius: '50%',
+      background: '#fff',
+    })
+    content.append(dot)
+  }
+  return content
 }

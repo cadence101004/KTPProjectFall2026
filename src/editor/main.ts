@@ -1,17 +1,25 @@
+import Phaser from 'phaser'
 import '../style.css'
 import './editor.css'
 import { AudioClock } from '../audio/AudioClock'
 import { hashFile } from '../audio/hash'
-import { repsFor } from '../engine/clipRules'
+import { findOnsets } from '../audio/onsets'
+import { defaultHits, hitTimes, repsFor, usesBeatMap } from '../engine/clipRules'
+import { countdownBeats } from '../engine/countdown'
+import { listenForKeys } from '../engine/input'
+import { LevelScene } from '../engine/LevelScene'
 import { allGames, metaFor } from '../minigames/allGames'
 import { listLevels, loadLevel, loadSong, saveLevel, saveSong } from '../storage/db'
-import type { Clip, Level } from '../types/level'
+import type { Clip, GameClip, Level } from '../types/level'
+import type { MiniGameMeta } from '../types/minigame'
 import { type BeatGrid, beatTimes, snapToGrid } from './beatGrid'
 import { placeMove, placeResize, snapLength } from './clipEditing'
 import { computePeaks } from './peaks'
+import { previewStart } from './preview'
 import { type ClipView, Timeline } from './Timeline'
 
 // Timeline editor (build step 4). 4a: waveform, play, scrub. 4b: clips. 4c: beat grid. 4d: save and load.
+// 4e: preview viewer, which runs the level in the real LevelScene.
 const app = document.querySelector<HTMLDivElement>('#app')!
 app.innerHTML = `
   <div class="editor">
@@ -26,6 +34,7 @@ app.innerHTML = `
     <div class="controls">
       <input type="file" id="song" accept="audio/*,video/mp4" />
       <button id="play" disabled>Play</button>
+      <button id="preview" disabled title="Play the level from the playhead in the gameplay view (P)">Preview</button>
       <span class="time"><b id="time">0.00</b> / <span id="length">0.00</span> s</span>
       <label>BPM <input id="bpm" type="number" min="40" max="300" step="0.01" value="120" /></label>
       <label>First beat (s) <input id="offset" type="number" min="0" step="0.01" value="0" /></label>
@@ -39,6 +48,7 @@ app.innerHTML = `
       <label>Zoom <input id="zoom" type="range" min="10" max="400" value="50" /></label>
     </div>
     <p id="status">Pick a song to start a level, or load a saved one.</p>
+    <div id="stage" class="stage"></div>
     <div id="waveform" class="waveform"></div>
     <div class="palette">
       <span>Add at playhead:</span>
@@ -47,9 +57,12 @@ app.innerHTML = `
       <button id="delete" class="danger" disabled>Delete clip</button>
     </div>
     <p id="selection" class="selection">No clip selected.</p>
-    <p class="help">Click or drag the waveform to move the playhead. Space plays and pauses. Drag a clip to move it,
+    <div id="clipOptions" class="clip-options"></div>
+    <p class="help">Drag the yellow handle in the bar above the waveform to move the playhead (works mid-preview too),
+      or click empty waveform. Space plays and pauses. Drag a clip to move it,
       drag its edges to resize. Delete removes the selected clip. Set BPM and the first beat so the grid lines
-      land on the drums; clip edges then snap to the grid. Ctrl+S saves.</p>
+      land on the drums; clip edges then snap to the grid. Ctrl+S saves. Preview (P) plays the level as a player
+      sees it, with the game controls live; Esc stops it.</p>
   </div>`
 
 const $ = <T extends HTMLElement>(id: string) => app.querySelector<T>('#' + id)!
@@ -57,6 +70,31 @@ const playButton = $<HTMLButtonElement>('play')
 
 const clock = new AudioClock()
 const timeline = new Timeline($('waveform'))
+const levelScene = new LevelScene(clock)
+
+new Phaser.Game({
+  type: Phaser.AUTO,
+  parent: 'stage',
+  width: 480,
+  height: 270,
+  backgroundColor: '#123047',
+  pixelArt: true,
+  scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+  scene: [levelScene],
+})
+
+// Loads the 321GO sound and finds its four counts so the countdown can line them up with the beat.
+async function loadCountdown(): Promise<void> {
+  try {
+    const buffer = await clock.loadSfx('/assets/audio/321GO_sfx.mp3')
+    const beats = countdownBeats(findOnsets(buffer.getChannelData(0), buffer.sampleRate), buffer.duration)
+    console.info('321GO counts found at', beats.map(b => b.toFixed(2)).join(', '), 's into the file')
+    levelScene.setCountdownSound({ buffer, beats })
+  } catch {
+    console.warn('Could not load the 321GO sound; buffers will play without a countdown.')
+  }
+}
+void loadCountdown()
 
 function newLevel(audioHash = ''): Level {
   return { title: 'Untitled level', audioHash, bpm: 120, beatOffset: 0, clips: [], media: [] }
@@ -67,8 +105,10 @@ let levelId: string = crypto.randomUUID() // the level's key in storage; Save ov
 let song: { file: Blob; name: string } | null = null // the MP3 this level is built on
 let waitingForSong: { id: string; level: Level } | null = null // a loaded level whose MP3 wasn't stored
 let snapDivision = 1 // grid lines per beat for snapping, 0 = off
+let beatMapDivision = 2 // beat map grid cells per beat: 2 = half beats, 4 = quarter beats
 let songLength = 0
 let playing = false
+let previewing = false // playing with the level running in the gameplay view and game controls live
 let playhead = 0 // song time while paused; while playing, the clock is the truth
 let selected = -1 // index of the selected clip, or -1
 
@@ -91,6 +131,44 @@ function pause(): void {
   clock.stop()
   playing = false
   playButton.textContent = 'Play'
+  if (previewing) {
+    previewing = false
+    levelScene.stop()
+    $('preview').textContent = 'Preview'
+  }
+}
+
+// Plays the level from the playhead (backed up to the start of a minigame it's inside) in the gameplay view.
+async function startPreview(): Promise<void> {
+  if (songLength === 0) return
+  if (playing) pause()
+  ;(document.activeElement as HTMLElement | null)?.blur() // so Space reaches the game, not a focused button
+  playhead = previewStart(level.clips, playhead)
+  previewing = true
+  $('preview').textContent = 'Stop preview'
+  await play()
+  levelScene.startAt(level, playhead)
+}
+
+// Clip edits and seeks during a preview would pull the timeline out from under it, so they end the preview.
+function endPreview(): void {
+  if (previewing) pause()
+}
+
+// Dragging the scrub bar. Playback (or a preview) pauses while you drag and picks back up where you let go.
+let resumeAfterScrub: 'play' | 'preview' | null = null
+function scrub(time: number, phase: 'start' | 'move' | 'end'): void {
+  if (phase === 'start') {
+    resumeAfterScrub = previewing ? 'preview' : playing ? 'play' : null
+    if (playing) pause()
+  }
+  playhead = Math.max(0, Math.min(songLength, time))
+  timeline.setPlayhead(playhead)
+  if (phase !== 'end') return
+  const resume = resumeAfterScrub
+  resumeAfterScrub = null
+  if (resume === 'preview') void startPreview()
+  else if (resume === 'play') void play()
 }
 
 function togglePlay(): void {
@@ -101,6 +179,7 @@ function togglePlay(): void {
 
 // Moves the playhead. If the song is playing it keeps playing from the new spot.
 function seek(time: number): void {
+  endPreview()
   playhead = Math.max(0, Math.min(songLength, time))
   if (playing) void clock.play(playhead)
   timeline.setPlayhead(playhead)
@@ -130,7 +209,16 @@ function viewOf(clip: Clip, index: number): ClipView {
       color = `rgba(255, 140, 60, ${strength})`
     }
   }
-  return { start: clip.start, end: clip.end, label, color, selected: index === selected }
+  const length = clip.end - clip.start
+  const hits = clip.type === 'game' && meta ? (hitTimes(meta, clip, level.bpm) ?? []) : []
+  return {
+    start: clip.start,
+    end: clip.end,
+    label,
+    color,
+    selected: index === selected,
+    hits: hits.map(time => (time - clip.start) / length),
+  }
 }
 
 // Keeps clips in time order (LevelRunner relies on it) and keeps the same clip selected.
@@ -146,6 +234,77 @@ function render(): void {
   $('selection').textContent = clip
     ? `${viewOf(clip, selected).label}: ${clip.start.toFixed(2)} s to ${clip.end.toFixed(2)} s (${(clip.end - clip.start).toFixed(2)} s)`
     : 'No clip selected.'
+  renderClipOptions(clip)
+}
+
+// Settings for the selected clip: the beat sync toggle (duration games that support it) and the beat map grid.
+function renderClipOptions(clip: Clip | undefined): void {
+  const panel = $('clipOptions')
+  panel.replaceChildren()
+  if (clip?.type !== 'game') return
+  const meta = metaFor(clip.gameId)
+  if (!meta) return
+
+  if (meta.kind === 'duration' && meta.canBeatSync) {
+    const toggle = document.createElement('label')
+    const box = Object.assign(document.createElement('input'), { type: 'checkbox', checked: !!clip.beatSync })
+    box.addEventListener('change', () => {
+      endPreview()
+      clip.beatSync = box.checked
+      render()
+    })
+    toggle.append(box, ' Beat sync')
+    panel.append(toggle)
+  }
+  if (usesBeatMap(meta, clip)) panel.append(beatMapEditor(clip, meta))
+}
+
+// A row of cells, one per half (or quarter) beat across the clip. Click a cell to add or remove a hit.
+function beatMapEditor(clip: GameClip, meta: MiniGameMeta): HTMLElement {
+  const editor = document.createElement('div')
+  editor.className = 'beat-map'
+  const length = clip.end - clip.start
+  const hits = clip.hits ?? defaultHits(meta, length, level.bpm)
+  const has = (beat: number) => hits.some(hit => Math.abs(hit - beat) < 1e-6)
+
+  const header = document.createElement('div')
+  header.className = 'beat-map-header'
+  const division = document.createElement('select')
+  division.innerHTML = '<option value="2">1/2 beat</option><option value="4">1/4 beat</option>'
+  division.value = String(beatMapDivision)
+  division.addEventListener('change', () => {
+    beatMapDivision = Number(division.value)
+    render()
+  })
+  const reset = Object.assign(document.createElement('button'), { textContent: 'Reset to default' })
+  reset.disabled = !clip.hits
+  reset.addEventListener('click', () => {
+    endPreview()
+    delete clip.hits
+    render()
+  })
+  header.append(`Beat map (${hits.length} hits${clip.hits ? ', custom' : ', default'})`, division, reset)
+
+  const cells = document.createElement('div')
+  cells.className = 'beat-map-cells'
+  const steps = Math.round((length / (60 / level.bpm)) * beatMapDivision)
+  for (let step = 0; step < steps; step++) {
+    const beat = step / beatMapDivision
+    const cell = document.createElement('button')
+    cell.className = 'cell'
+    if (step % beatMapDivision === 0) cell.classList.add('on-beat')
+    if (beat % 4 === 0) cell.classList.add('bar')
+    if (has(beat)) cell.classList.add('hit')
+    cell.title = `Beat ${beat + 1}`
+    cell.addEventListener('click', () => {
+      endPreview()
+      clip.hits = has(beat) ? hits.filter(hit => Math.abs(hit - beat) >= 1e-6) : [...hits, beat].sort((a, b) => a - b)
+      render()
+    })
+    cells.append(cell)
+  }
+  editor.append(header, cells)
+  return editor
 }
 
 function drawGrid(): void {
@@ -162,6 +321,7 @@ function syncInputs(): void {
 // Adds a clip at the playhead. gameId '' means a buffer.
 function addClip(gameId: string): void {
   if (songLength === 0) return
+  endPreview()
   const meta = gameId ? metaFor(gameId) : null
   const length = snapLength(meta, gameId ? 4 : 2, level.bpm)
   const span = placeMove(level.clips, -1, snapToGrid(playhead, grid()), length, songLength)
@@ -180,6 +340,7 @@ function addClip(gameId: string): void {
 // Applies a drag or resize from the timeline, or snaps the clip back if the new spot isn't legal.
 // The dragged edge (or a moved clip's start) snaps to the beat grid first.
 function editClip(index: number, side: 'start' | 'end' | undefined, start: number, end: number): void {
+  endPreview()
   const clip = level.clips[index]
   const span = side
     ? placeResize(level.clips, index, side, snapToGrid(side === 'end' ? end : start, grid()), clipMeta(clip), level.bpm, songLength)
@@ -195,6 +356,7 @@ function editClip(index: number, side: 'start' | 'end' | undefined, start: numbe
 // A new BPM changes task cycle lengths, so re-snap every task clip (shrinking if a neighbour is in the way).
 function changeBpm(bpm: number): void {
   if (!(bpm > 0)) return
+  endPreview()
   level.bpm = bpm
   level.clips.forEach((clip, index) => {
     const meta = clipMeta(clip)
@@ -215,6 +377,7 @@ function changeOffset(offset: number): void {
 
 function deleteSelected(): void {
   if (!level.clips[selected]) return
+  endPreview()
   level.clips.splice(selected, 1)
   selected = -1
   render()
@@ -233,6 +396,7 @@ async function openSong(file: Blob, name: string): Promise<void> {
   await timeline.show(computePeaks(buffer.getChannelData(0), buffer.sampleRate), songLength)
   $('length').textContent = songLength.toFixed(2)
   playButton.disabled = false
+  $<HTMLButtonElement>('preview').disabled = false
   $<HTMLButtonElement>('setOffset').disabled = false
   $<HTMLButtonElement>('save').disabled = false
   drawGrid()
@@ -343,7 +507,12 @@ $('load').addEventListener('click', () => {
 })
 $('new').addEventListener('click', startNewLevel)
 playButton.addEventListener('click', togglePlay)
+$('preview').addEventListener('click', () => (previewing ? pause() : void startPreview()))
+listenForKeys(clock, input => {
+  if (previewing) levelScene.send(input)
+})
 timeline.onSeek(seek)
+timeline.onScrub(scrub)
 timeline.onClipEdit(editClip)
 timeline.onClipClick(index => {
   selected = index
@@ -374,7 +543,14 @@ window.addEventListener('keydown', event => {
     return
   }
   if (event.target instanceof HTMLInputElement) return
-  if (event.code === 'Space') {
+  if (previewing) {
+    // During a preview the keys belong to the game; only Esc is kept for stopping it.
+    if (event.code === 'Escape') pause()
+    return
+  }
+  if (event.code === 'KeyP') {
+    void startPreview()
+  } else if (event.code === 'Space') {
     event.preventDefault()
     togglePlay()
   } else if (event.code === 'Delete' || event.code === 'Backspace') {

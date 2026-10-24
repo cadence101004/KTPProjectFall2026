@@ -8,6 +8,7 @@ export class AudioClock {
   private source: AudioBufferSourceNode | null = null
   private startedAt = 0
   private startOffset = 0
+  private readonly sfx = new Set<AudioBufferSourceNode>() // scheduled sound effects, stopped with the song
 
   // Decodes an uploaded MP3 into memory so it can be started with sample-accurate timing.
   async load(file: Blob): Promise<void> {
@@ -43,8 +44,36 @@ export class AudioClock {
     return this.ctx.currentTime - this.startedAt + this.startOffset
   }
 
+  // Decodes a sound effect from a URL (e.g. '/assets/audio/321GO_sfx.mp3') for playSfx.
+  async loadSfx(url: string): Promise<AudioBuffer> {
+    const response = await fetch(url)
+    return this.ctx.decodeAudioData(await response.arrayBuffer())
+  }
+
+  // Plays a sound effect at a song time, scheduled on the music's own clock so it lands exactly in sync.
+  // If that time has already passed it joins partway through. `rate` changes speed (and pitch).
+  playSfx(buffer: AudioBuffer, songTime: number, rate = 1, fileOffset = 0): void {
+    if (!this.source) return
+    let when = this.startedAt + (songTime - this.startOffset)
+    if (when < this.ctx.currentTime) {
+      fileOffset += (this.ctx.currentTime - when) * rate
+      when = this.ctx.currentTime
+    }
+    if (fileOffset >= buffer.duration) return
+    const sound = this.ctx.createBufferSource()
+    sound.buffer = buffer
+    sound.playbackRate.value = rate
+    sound.connect(this.ctx.destination)
+    sound.start(when, fileOffset)
+    sound.onended = () => this.sfx.delete(sound)
+    this.sfx.add(sound)
+  }
+
   // Stops playback and freezes songTime where the song stopped, so play(songTime()) resumes it.
+  // Pending and playing sound effects stop too.
   stop(): void {
+    for (const sound of this.sfx) sound.stop()
+    this.sfx.clear()
     if (!this.source) return
     this.startOffset = Math.max(0, this.songTime())
     this.source.stop()

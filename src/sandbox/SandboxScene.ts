@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
-import { repsFor } from '../engine/clipRules'
+import { hitTimes, repsFor } from '../engine/clipRules'
 import { allGames } from '../minigames/allGames'
+import type { GameClip } from '../types/level'
 import type { GameInput, MiniGame, MiniGameParams } from '../types/minigame'
 import type { MetronomeClock } from './MetronomeClock'
 
@@ -57,6 +58,16 @@ export class SandboxScene extends Phaser.Scene {
         : Math.max(run.length, meta.minDuration)
     const startTime = COUNT_IN_BEATS * beatLength
 
+    // The sandbox plays each game with its default beat map, exactly as a fresh clip in the editor would.
+    const clip: GameClip = {
+      type: 'game',
+      gameId: run.id,
+      start: startTime,
+      end: startTime + duration,
+      difficulty: run.difficulty,
+      beatSync: run.beatSync,
+    }
+
     await this.clock.start(run.bpm)
     this.params = {
       scene: this,
@@ -65,6 +76,7 @@ export class SandboxScene extends Phaser.Scene {
       reps: repsFor(meta, duration, run.bpm),
       bpm: run.bpm,
       beatSync: meta.kind === 'task' || (run.beatSync && meta.canBeatSync),
+      hits: hitTimes(meta, clip, run.bpm),
       difficulty: run.difficulty,
     }
     this.endTime = startTime + duration
