@@ -1,5 +1,6 @@
 import WaveSurfer from 'wavesurfer.js'
 import RegionsPlugin from 'wavesurfer.js/plugins/regions'
+import { GAME_FONT } from '../minigames/shared/font'
 
 // How one clip looks on the timeline. The editor decides; the timeline only draws.
 export interface ClipView {
@@ -175,7 +176,7 @@ function clipLabel(clip: ClipView): HTMLElement {
   label.textContent = clip.label
   Object.assign(label.style, {
     padding: '2px 6px',
-    font: '600 12px system-ui, sans-serif',
+    font: `600 12px ${GAME_FONT}`, // inline: page CSS doesn't reach into wavesurfer's shadow DOM
     color: '#fff',
     whiteSpace: 'nowrap',
     overflow: 'hidden',

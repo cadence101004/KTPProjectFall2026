@@ -6,6 +6,7 @@
 // - Windows (params.hits is null): finish one task anywhere inside each cycle. For games like scrubbing.
 import type Phaser from 'phaser'
 import type { GameInput, MiniGame, MiniGameParams, Status, TaskMeta } from '../../types/minigame'
+import { textStyle } from '../shared/font'
 import { HIT_WINDOW, judgePress } from '../shared/judgePress'
 
 export class TemplateTaskGame implements MiniGame {
@@ -35,7 +36,7 @@ export class TemplateTaskGame implements MiniGame {
   start(params: MiniGameParams): void {
     this.params = params
     const { width, height } = params.scene.scale
-    this.label = params.scene.add.text(width / 2, height * 0.8, '', { fontSize: '18px' }).setOrigin(0.5)
+    this.label = params.scene.add.text(width / 2, height * 0.8, '', textStyle(18)).setOrigin(0.5)
     this.target = params.scene.add.circle(width / 2, height / 2, 20, 0xffcc4d)
     this.ring = params.scene.add.circle(width / 2, height / 2, 20).setStrokeStyle(3, 0xffffff)
     this.objects.push(this.label, this.target, this.ring)

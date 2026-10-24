@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import { allGames, metaFor } from '../minigames/allGames'
+import { textStyle } from '../minigames/shared/font'
 import type { Clip, GameClip, Level } from '../types/level'
 import type { GameInput, MiniGame } from '../types/minigame'
 import { hitTimes, repsFor } from './clipRules'
@@ -19,6 +20,12 @@ export interface CountdownSound {
   beats: number[]
 }
 
+// A button on the Game Over screen. The host (game or editor) decides what each one does.
+export interface MenuOption {
+  label: string
+  action: () => void
+}
+
 // Plays a level: steps through its clips on the song clock, runs each minigame through the MiniGame
 // contract, shows buffer screens, and keeps lives. The editor preview and the real game both use this.
 export class LevelScene extends Phaser.Scene {
@@ -29,7 +36,12 @@ export class LevelScene extends Phaser.Scene {
   private runner: LevelRunner | null = null
   private current: { game: MiniGame; clip: GameClip } | null = null
   private lives = START_LIVES
+  private practice = false // infinite lives: failures are counted instead
+  private misses = 0
   private running = false
+  private gameOverOptions: MenuOption[] = []
+  private gameOver: { objects: Phaser.GameObjects.GameObject[]; buttons: Phaser.GameObjects.Text[]; choice: number } | null =
+    null
   private hud!: Phaser.GameObjects.Text // lives, top left
   private banner!: Phaser.GameObjects.Text // big center text: buffer info, prompts, results
 
@@ -43,17 +55,25 @@ export class LevelScene extends Phaser.Scene {
     this.countdownSound = sound
   }
 
+  // The buttons on the Game Over screen, e.g. Restart Level and Main Menu.
+  setGameOverOptions(options: MenuOption[]): void {
+    this.gameOverOptions = options
+  }
+
+  // Practice mode: no Game Over; failures are counted on the HUD instead of costing lives.
+  setPractice(on: boolean): void {
+    this.practice = on
+    if (this.running) this.drawHud()
+  }
+
   preload(): void {
     for (const make of Object.values(allGames)) make().preload?.(this.load)
   }
 
   create(): void {
-    this.hud = this.add.text(8, 8, '', { fontSize: '14px' }).setDepth(1000)
+    this.hud = this.add.text(8, 8, '', textStyle(14)).setDepth(1000)
     this.banner = this.add
-      .text(this.scale.width / 2, this.scale.height / 2, 'Press Preview to play the level', {
-        fontSize: '18px',
-        align: 'center',
-      })
+      .text(this.scale.width / 2, this.scale.height / 2, 'Press Preview to play the level', textStyle(18, { align: 'center' }))
       .setOrigin(0.5)
       .setDepth(1000)
     for (const phase of ['down', 'move', 'up'] as const) {
@@ -68,10 +88,12 @@ export class LevelScene extends Phaser.Scene {
   // Starts playing `level` from song time `time`, with full lives. The caller starts the audio there too.
   startAt(level: Level, time: number): void {
     this.endCurrent(false)
+    this.hideGameOver()
     this.level = level
     this.runner = new LevelRunner(level, this.clock)
     this.runner.seek(time)
     this.lives = START_LIVES
+    this.misses = 0
     this.countdown = null
     this.running = true
     this.banner.setText('')
@@ -81,6 +103,7 @@ export class LevelScene extends Phaser.Scene {
   // Stops playing and clears the screen.
   stop(): void {
     this.endCurrent(false)
+    this.hideGameOver()
     this.running = false
     this.runner = null
     this.countdown = null
@@ -88,14 +111,18 @@ export class LevelScene extends Phaser.Scene {
     this.hud.setText('')
   }
 
-  // Forwards input to the running minigame.
+  // Forwards input to the running minigame, or to the Game Over menu while it's up.
   send(input: GameInput): void {
-    this.current?.game.handleInput(input)
+    if (this.gameOver) this.menuInput(input)
+    else this.current?.game.handleInput(input)
   }
 
   update(): void {
-    if (!this.running || !this.runner) return
-    for (const event of this.runner.update()) this.handle(event)
+    if (!this.running || !this.runner || this.gameOver) return
+    for (const event of this.runner.update()) {
+      this.handle(event)
+      if (this.gameOver) return // nothing else runs after Game Over; the music plays on underneath
+    }
     const time = this.clock.songTime()
     this.current?.game.update(time)
     this.drawCountdown(time)
@@ -103,7 +130,7 @@ export class LevelScene extends Phaser.Scene {
 
   private handle(event: RunnerEvent): void {
     if (event.type === 'levelEnd') {
-      this.banner.setText(this.lives > 0 ? 'LEVEL COMPLETE!' : 'GAME OVER')
+      this.banner.setText(this.practice ? `LEVEL COMPLETE!\n\n${this.misses} misses` : 'LEVEL COMPLETE!')
       return
     }
     const clip = event.clip
@@ -142,22 +169,76 @@ export class LevelScene extends Phaser.Scene {
     this.flash(meta.prompt)
   }
 
-  // Ends the running minigame. When `judge` is set, a failure (or a task game still running) costs a life.
+  // Ends the running minigame. When `judge` is set, a failure (or a task game still running) costs a life,
+  // or in practice mode adds a miss. Losing the last life brings up Game Over.
   private endCurrent(judge: boolean): void {
     if (!this.current) return
     const { game, clip } = this.current
     this.current = null
+    let outOfLives = false
     if (judge) {
       game.update(clip.end) // lets a task game see its last window close
       const status = game.status()
       const failed = status === 'failed' || (status === 'running' && game.meta.kind === 'task')
-      if (failed) {
+      if (failed && this.practice) {
+        this.misses++
+        this.flash('MISS!')
+      } else if (failed) {
         this.lives = Math.max(0, this.lives - 1)
-        this.flash(this.lives > 0 ? 'MISS!' : 'GAME OVER')
+        outOfLives = this.lives === 0
+        if (!outOfLives) this.flash('MISS!')
       }
       this.drawHud()
     }
     game.destroy()
+    if (outOfLives) this.showGameOver()
+  }
+
+  // Game Over: the level stops (the music keeps going) and a menu offers the host's options.
+  private showGameOver(): void {
+    this.countdown = null
+    this.banner.setText('')
+    const { width, height } = this.scale
+    const shade = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.7).setDepth(2000)
+    const title = this.add
+      .text(width / 2, height * 0.32, 'GAME OVER', textStyle(40, { fontStyle: 'bold', color: '#ff6b6b' }))
+      .setOrigin(0.5)
+      .setDepth(2001)
+    const buttons = this.gameOverOptions.map((option, index) =>
+      this.add
+        .text(width / 2, height * 0.58 + index * 34, option.label, textStyle(20, { padding: { x: 12, y: 4 } }))
+        .setOrigin(0.5)
+        .setDepth(2001)
+        .setInteractive({ useHandCursor: true })
+        .on('pointerover', () => this.chooseMenu(index))
+        .on('pointerdown', () => option.action()),
+    )
+    this.gameOver = { objects: [shade, title, ...buttons], buttons, choice: 0 }
+    this.chooseMenu(0)
+  }
+
+  private hideGameOver(): void {
+    for (const object of this.gameOver?.objects ?? []) object.destroy()
+    this.gameOver = null
+  }
+
+  // Highlights one Game Over button.
+  private chooseMenu(choice: number): void {
+    if (!this.gameOver) return
+    this.gameOver.choice = choice
+    this.gameOver.buttons.forEach((button, index) => {
+      button.setColor(index === choice ? '#123047' : '#ffffff')
+      button.setBackgroundColor(index === choice ? '#ffcc4d' : '#00000000')
+    })
+  }
+
+  // Arrows move between Game Over buttons; action picks one.
+  private menuInput(input: GameInput): void {
+    if (!this.gameOver || input.kind !== 'button' || !input.pressed) return
+    const count = this.gameOver.buttons.length
+    if (input.button === 'up' || input.button === 'left') this.chooseMenu((this.gameOver.choice + count - 1) % count)
+    if (input.button === 'down' || input.button === 'right') this.chooseMenu((this.gameOver.choice + 1) % count)
+    if (input.button === 'action') this.gameOverOptions[this.gameOver.choice]?.action()
   }
 
   // Buffer screen: lives left and what's coming next. If a minigame follows, the 321GO cue is scheduled
@@ -184,14 +265,18 @@ export class LevelScene extends Phaser.Scene {
   // Briefly shows big text, e.g. a minigame's prompt.
   private flash(text: string): void {
     const label = this.add
-      .text(this.scale.width / 2, this.scale.height * 0.25, text, { fontSize: '32px', fontStyle: 'bold', color: '#ffcc4d' })
+      .text(this.scale.width / 2, this.scale.height * 0.25, text, textStyle(32, { fontStyle: 'bold', color: '#ffcc4d' }))
       .setOrigin(0.5)
       .setDepth(1001)
     this.tweens.add({ targets: label, alpha: 0, scale: 1.3, duration: 600, onComplete: () => label.destroy() })
   }
 
   private drawHud(): void {
-    this.hud.setText(`${'♥'.repeat(this.lives)}${'♡'.repeat(START_LIVES - this.lives)}`)
+    this.hud.setText(
+      this.practice
+        ? `Practice   misses: ${this.misses}`
+        : `${'♥'.repeat(this.lives)}${'♡'.repeat(START_LIVES - this.lives)}`,
+    )
   }
 }
 

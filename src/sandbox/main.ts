@@ -3,6 +3,7 @@ import '../style.css'
 import './sandbox.css'
 import { listenForKeys } from '../engine/input'
 import { allGames } from '../minigames/allGames'
+import { loadGameFont } from '../minigames/shared/font'
 import { MetronomeClock } from './MetronomeClock'
 import { SandboxScene } from './SandboxScene'
 
@@ -27,16 +28,20 @@ const $ = <T extends HTMLElement>(id: string) => app.querySelector<T>('#' + id)!
 const clock = new MetronomeClock()
 const scene = new SandboxScene(clock)
 
-new Phaser.Game({
-  type: Phaser.AUTO,
-  parent: 'stage',
-  width: 480,
-  height: 270,
-  backgroundColor: '#123047',
-  pixelArt: true,
-  scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-  scene: [scene],
-})
+// Phaser starts once the game font is ready, so its text never gets stuck in a fallback font.
+void loadGameFont().then(
+  () =>
+    new Phaser.Game({
+      type: Phaser.AUTO,
+      parent: 'stage',
+      width: 480,
+      height: 270,
+      backgroundColor: '#123047',
+      pixelArt: true,
+      scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+      scene: [scene],
+    }),
+)
 
 listenForKeys(clock, input => scene.send(input))
 

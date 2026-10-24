@@ -49,7 +49,8 @@ One beat lasts `60 / params.bpm` seconds. Use it to put cues and animations on t
 2. **Never end early.** If the player wins before the clip is over, set `'won'` and keep showing a victory state until `destroy()` is called. The level has to stay in sync with the music.
 3. **`'failed'` is final.** Once a game has failed, it stays failed. The engine takes away a life, and the music keeps going.
 4. **Clean up.** Add every game object you create to `this.objects` so `destroy()` removes it. Anything left behind will show up in the next minigame.
-5. **Size things relative to the screen.** Use `params.scene.scale.width` and `height`, not fixed pixel positions.
+5. **Text uses the game font (Pixelify Sans).** Phaser draws text onto a canvas where page CSS doesn't reach, so create text with `textStyle` from `src/minigames/shared/font.ts`: `scene.add.text(x, y, 'FIRE!', textStyle(24, { color: '#ffcc4d' }))`.
+6. **Size things relative to the screen.** Use `params.scene.scale.width` and `height`, not fixed pixel positions.
 6. **Use the abstract buttons.** Listen for `'left'`, `'right'`, `'up'`, `'down'`, `'action'`, or pointer input (`x`, `y` from 0 to 1). Never read the keyboard directly, so touch and gamepad work for free.
 7. **Never import from another minigame or from `src/engine/`.** Import types from `src/types/minigame.ts` and shared helpers from `src/minigames/shared/` only.
 

@@ -9,6 +9,7 @@ import { countdownBeats } from '../engine/countdown'
 import { listenForKeys } from '../engine/input'
 import { LevelScene } from '../engine/LevelScene'
 import { allGames, metaFor } from '../minigames/allGames'
+import { loadGameFont } from '../minigames/shared/font'
 import { listLevels, loadLevel, loadSong, saveLevel, saveSong } from '../storage/db'
 import type { Clip, GameClip, Level } from '../types/level'
 import type { MiniGameMeta } from '../types/minigame'
@@ -35,6 +36,8 @@ app.innerHTML = `
       <input type="file" id="song" accept="audio/*,video/mp4" />
       <button id="play" disabled>Play</button>
       <button id="preview" disabled title="Play the level from the playhead in the gameplay view (P)">Preview</button>
+      <label title="Misses are counted instead of costing lives, so the preview never ends in Game Over">
+        <input id="practice" type="checkbox" checked /> Practice</label>
       <span class="time"><b id="time">0.00</b> / <span id="length">0.00</span> s</span>
       <label>BPM <input id="bpm" type="number" min="40" max="300" step="0.01" value="120" /></label>
       <label>First beat (s) <input id="offset" type="number" min="0" step="0.01" value="0" /></label>
@@ -72,16 +75,35 @@ const clock = new AudioClock()
 const timeline = new Timeline($('waveform'))
 const levelScene = new LevelScene(clock)
 
-new Phaser.Game({
-  type: Phaser.AUTO,
-  parent: 'stage',
-  width: 480,
-  height: 270,
-  backgroundColor: '#123047',
-  pixelArt: true,
-  scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-  scene: [levelScene],
-})
+// Phaser starts once the game font is ready, so its text never gets stuck in a fallback font.
+void loadGameFont().then(
+  () =>
+    new Phaser.Game({
+      type: Phaser.AUTO,
+      parent: 'stage',
+      width: 480,
+      height: 270,
+      backgroundColor: '#123047',
+      pixelArt: true,
+      scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+      scene: [levelScene],
+    }),
+)
+
+// In the editor, Restart replays the preview from where it began, and Main Menu goes back to editing.
+let previewOrigin = 0
+levelScene.setPractice(true)
+levelScene.setGameOverOptions([
+  {
+    label: 'Restart Level',
+    action: () => {
+      pause() // first, since pausing moves the playhead to the current song time
+      playhead = previewOrigin
+      void startPreview()
+    },
+  },
+  { label: 'Main Menu', action: () => pause() },
+])
 
 // Loads the 321GO sound and finds its four counts so the countdown can line them up with the beat.
 async function loadCountdown(): Promise<void> {
@@ -144,6 +166,7 @@ async function startPreview(): Promise<void> {
   if (playing) pause()
   ;(document.activeElement as HTMLElement | null)?.blur() // so Space reaches the game, not a focused button
   playhead = previewStart(level.clips, playhead)
+  previewOrigin = playhead
   previewing = true
   $('preview').textContent = 'Stop preview'
   await play()
@@ -508,6 +531,9 @@ $('load').addEventListener('click', () => {
 $('new').addEventListener('click', startNewLevel)
 playButton.addEventListener('click', togglePlay)
 $('preview').addEventListener('click', () => (previewing ? pause() : void startPreview()))
+$<HTMLInputElement>('practice').addEventListener('change', event => {
+  levelScene.setPractice((event.target as HTMLInputElement).checked)
+})
 listenForKeys(clock, input => {
   if (previewing) levelScene.send(input)
 })
