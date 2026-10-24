@@ -15,6 +15,11 @@ export class AudioClock {
     this.buffer = await this.ctx.decodeAudioData(bytes)
   }
 
+  // The decoded song, for drawing its waveform. Null until load() finishes.
+  getBuffer(): AudioBuffer | null {
+    return this.buffer
+  }
+
   // Starts the song at `offset` seconds of song time. The first call must come from a user gesture.
   async play(offset = 0): Promise<void> {
     if (!this.buffer) throw new Error('AudioClock.play called before load')
