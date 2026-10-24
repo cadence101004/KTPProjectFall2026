@@ -4,7 +4,7 @@ A WarioWare-style pirate rhythm game. Players survive a rapid-fire sequence of p
 
 ## Overview
 
-Every level is a song. Each minigame is a clip on that song's timeline, so prompts land on the beat and the action speeds up and slows down with the music. Fail a minigame and you lose a life, but the music never stops. Lose all three and it's Game Over.
+Every level is a song, charted like an osu! map. Each minigame is a clip on that song's timeline, so prompts land on the beat, and a faster song makes for a harder level. Fail a minigame and you lose a life, but the music never stops. Lose all three and it's Game Over.
 
 ## Planned Features
 
@@ -46,11 +46,12 @@ Run locally with `npm install` then `npm run dev`.
 - [ ] Confirm Phaser version (installed: Phaser 4)
 
 ### 1. Audio clock + level runner
-- [ ] `AudioClock`: load an uploaded MP3 and play it
-- [ ] `AudioClock`: report accurate song time from `AudioContext.currentTime`
-- [ ] Level and Clip types
-- [ ] Hardcoded test level JSON
-- [ ] `LevelRunner`: switch clips at the right song times
+- [x] `AudioClock`: load an uploaded MP3 and play it
+- [x] `AudioClock`: report accurate song time from `AudioContext.currentTime`
+- [x] Level and Clip types
+- [x] Hardcoded test level
+- [x] `LevelRunner`: switch clips at the right song times
+- [x] Debug page to check clip switches by ear
 
 ### 2. Minigame contract + first 3 minigames
 - [ ] `MiniGame` interface and metadata types
@@ -61,6 +62,8 @@ Run locally with `npm install` then `npm run dev`.
 ### 3. Lives, buffer zones, Game Over
 - [ ] 3 lives, failure costs one life, music keeps playing
 - [ ] Buffer zones show lives and the next prompt
+- [ ] 321GO countdown with "GO" landing on the next game's start, plus a control hint flash
+- [ ] Countdown speed auto-synced to BPM, with a per-level manual override
 - [ ] Game Over screen with Restart Level and Main Menu
 
 ### 4. Timeline editor
@@ -92,6 +95,9 @@ Run locally with `npm install` then `npm run dev`.
 - [ ] Undo and redo
 - [ ] In-editor minigame preview
 - [ ] Keyboard, touch, and gamepad input
+
+### Stretch goals
+- [ ] Song speed modifier (play a level faster for extra difficulty, timings scale with it)
 
 ### Stretch minigames
 - [ ] Patch the Hull

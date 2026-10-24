@@ -43,7 +43,7 @@ describe('LevelRunner.update', () => {
       clock.t = t
       return runner.update().map(label)
     }
-    return { at }
+    return { at, runner }
   }
 
   function label(e: RunnerEvent): string {
@@ -84,5 +84,31 @@ describe('LevelRunner.update', () => {
     at(23)
     expect(at(24)).toEqual(['end:6', 'levelEnd'])
     expect(at(25)).toEqual([])
+  })
+
+  it('seeking mid-clip starts that clip on the next update', () => {
+    const { at, runner } = setup()
+    runner.seek(12)
+    expect(at(12)).toEqual(['start:3'])
+  })
+
+  it('seeking to a boundary starts the later clip only', () => {
+    const { at, runner } = setup()
+    runner.seek(8)
+    expect(at(8)).toEqual(['start:2'])
+  })
+
+  it('restarting after the level ended plays it again from the top', () => {
+    const { at, runner } = setup()
+    at(30)
+    runner.seek(0)
+    expect(at(0)).toEqual(['start:0'])
+    expect(at(30)).toContain('levelEnd')
+  })
+
+  it('seeking past the last clip ends the level', () => {
+    const { at, runner } = setup()
+    runner.seek(30)
+    expect(at(30)).toEqual(['levelEnd'])
   })
 })

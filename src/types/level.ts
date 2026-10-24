@@ -40,6 +40,7 @@ export interface Level {
   title: string
   audioHash: string
   bpm: number
+  countdownRate?: number // manual 321GO speed; absent means auto from bpm
   clips: Clip[]
   media: MediaClip[]
 }

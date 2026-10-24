@@ -1,4 +1,5 @@
 import './style.css'
+import { mountDebugPage } from './debug/DebugPage'
 
-// Entry point. The AudioClock and LevelRunner get wired in here during build order step 1.
-document.querySelector<HTMLDivElement>('#app')!.textContent = 'PirateWare'
+// Build step 1: the debug page stands in for the game until the minigames exist.
+mountDebugPage(document.querySelector<HTMLDivElement>('#app')!)

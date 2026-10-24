@@ -2,6 +2,8 @@
 
 A WarioWare-style pirate rhythm game. Players survive a sequence of fast minigames synced to music, with 3 lives. Includes a timeline editor where users upload their own MP3s and place minigames and buffer zones like clips in a video editor.
 
+Think of each level like an osu! map: the song and how the map is charted set the difficulty (a faster song makes a harder level). The game does not speed up between rounds the way WarioWare does.
+
 ## Working style (IMPORTANT, follow every session)
 
 - Implement and explain **one function at a time**. After each function, stop and wait for Connor to confirm before writing the next one.
@@ -66,6 +68,7 @@ interface MiniGame {
   "title": "Kraken's Lullaby",
   "audioHash": "sha256-of-the-mp3",
   "bpm": 128,
+  "countdownRate": 1.25,
   "clips": [
     { "type": "buffer", "start": 0.0, "end": 4.0 },
     { "type": "game", "gameId": "fire_cannon", "start": 4.0, "end": 7.75, "difficulty": 1 },
@@ -88,6 +91,14 @@ interface MiniGame {
 - Times are in seconds of song time.
 - Audio is referenced by SHA-256 hash, not embedded. Shared levels require the player to supply their own MP3; warn if the hash does not match.
 - Clips must not overlap. Buffer zones show lives remaining and the upcoming minigame prompt.
+
+### Countdown cue (3, 2, 1, GO)
+
+- Before every game clip, `public/assets/audio/321GO_sfx.mp3` plays near the end of the preceding buffer, scheduled on the AudioClock's context so **"GO" lands exactly on the game clip's `start`**. The upcoming game's control hint flashes with it.
+- Speed is set with `AudioBufferSourceNode.playbackRate` (pitch rises with speed; that is intended).
+- Auto rate from BPM: `rate = SFX_BEAT_INTERVAL / (60 / bpm)`, where `SFX_BEAT_INTERVAL` is the measured gap between "3" and "2" in the sfx file. This puts each count on a song beat.
+- Manual override: the level's optional `countdownRate` replaces the auto rate. Absent means auto.
+- If a buffer is shorter than the countdown at that rate, the editor warns and the countdown starts with the buffer (GO still lands on the clip start).
 
 ### Media track (background images and video)
 

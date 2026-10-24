@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Songs stay local (copyright). Only sound effects and default tracks are committed.
+public/assets/audio/*
+!public/assets/audio/*_sfx*
+!public/assets/audio/*_default*

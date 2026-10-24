@@ -17,3 +17,51 @@ body {
 canvas {
   image-rendering: pixelated;
 }
+
+/* Debug page (build step 1) */
+.debug {
+  width: min(560px, calc(100% - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.debug h1 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.debug .controls {
+  display: flex;
+  gap: 8px;
+}
+
+.debug button {
+  padding: 8px 14px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.debug .readout {
+  display: grid;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.debug .flash {
+  min-height: 4rem;
+  display: grid;
+  place-items: center;
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: #ffcc4d;
+  opacity: 0.25;
+}
+
+.debug .log {
+  margin: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  font-family: ui-monospace, monospace;
+  font-size: 0.85rem;
+}

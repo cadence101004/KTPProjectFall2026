@@ -55,4 +55,14 @@ export class LevelRunner {
     }
     return events
   }
+
+  // Jumps to `time` for restart or editor playback. The next update() starts whichever clip
+  // is playing at `time`, even mid-clip. The caller moves the audio with clock.play(time).
+  seek(time: number): void {
+    const clips = this.level.clips
+    const firstUnfinished = clips.findIndex(clip => clip.end > time)
+    this.next = firstUnfinished === -1 ? clips.length : firstUnfinished
+    this.active = -1
+    this.finished = false
+  }
 }
