@@ -6,8 +6,7 @@
 // - Windows (params.hits is null): finish one task anywhere inside each cycle. For games like scrubbing.
 import type Phaser from 'phaser'
 import type { GameInput, MiniGame, MiniGameParams, Status, TaskMeta } from '../../types/minigame'
-
-const HIT_WINDOW = 0.12 // seconds either side of a hit that still count as on time
+import { HIT_WINDOW, judgePress } from '../shared/judgePress'
 
 export class TemplateTaskGame implements MiniGame {
   meta: TaskMeta = {
@@ -24,6 +23,7 @@ export class TemplateTaskGame implements MiniGame {
   private rep = 0 // windows mode: which task the player is on, 0-based
   private repDone = false // windows mode: has the current task been completed?
   private nextHit = 0 // beat map mode: index of the next hit to press
+  private failReason = 'MISSED!'
   private objects: Phaser.GameObjects.GameObject[] = [] // everything added to the scene, for destroy()
   private label!: Phaser.GameObjects.Text
   private target!: Phaser.GameObjects.Arc
@@ -58,7 +58,7 @@ export class TemplateTaskGame implements MiniGame {
 
     // Draw the current state. After a win, keep showing it until the clip ends (never end early).
     if (this.result === 'won') this.label.setText('NICE!')
-    else if (this.result === 'failed') this.label.setText('MISSED!')
+    else if (this.result === 'failed') this.label.setText(this.failReason)
     else if (hits) this.label.setText(`Hit ${this.nextHit + 1} / ${hits.length}`)
     else this.label.setText(`Task ${this.rep + 1} / ${this.params.reps}${this.repDone ? '  done' : ''}`)
   }
@@ -68,11 +68,15 @@ export class TemplateTaskGame implements MiniGame {
     if (input.kind !== 'button' || input.button !== 'action' || !input.pressed) return
     const hits = this.params.hits
     if (hits) {
-      // Beat map: a press counts if it's within HIT_WINDOW of the next hit. Presses far from a hit are ignored.
-      if (Math.abs(input.songTime - hits[this.nextHit]) <= HIT_WINDOW) {
+      // Beat map: judged by the shared rules, so every rhythm game feels the same (see shared/judgePress.ts).
+      const verdict = judgePress(hits, this.nextHit, input.songTime, this.params.startTime)
+      if (verdict === 'hit') {
         this.nextHit++
         this.target.setFillStyle(0x7dff7d)
         if (this.nextHit === hits.length) this.result = 'won'
+      } else if (verdict === 'early' || verdict === 'late') {
+        this.result = 'failed'
+        this.failReason = verdict === 'early' ? 'TOO EARLY!' : 'TOO LATE!'
       }
     } else if (!this.repDone) {
       // Windows: replace with your game's task. Here, one press completes the current cycle's task.
@@ -90,7 +94,7 @@ export class TemplateTaskGame implements MiniGame {
     this.objects = []
   }
 
-  // Beat map: letting a hit pass by without pressing fails the game.
+  // Beat map: letting a hit's window close without pressing fails the game.
   private checkMissedHit(songTime: number, hits: number[]): void {
     if (this.nextHit < hits.length && songTime > hits[this.nextHit] + HIT_WINDOW) this.result = 'failed'
   }
