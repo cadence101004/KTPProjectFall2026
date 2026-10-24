@@ -43,7 +43,7 @@ Run locally with `npm install` then `npm run dev`.
 - [x] Vite + TypeScript project scaffolded
 - [x] Sprites moved into `public/assets/sprites`
 - [x] Source folders created
-- [ ] Confirm Phaser version (installed: Phaser 4)
+- [x] Confirm Phaser version (Phaser 4)
 
 ### 1. Audio clock + level runner
 - [x] `AudioClock`: load an uploaded MP3 and play it
@@ -54,7 +54,9 @@ Run locally with `npm install` then `npm run dev`.
 - [x] Debug page to check clip switches by ear
 
 ### 2. Minigame contract + first 3 minigames
-- [ ] `MiniGame` interface and metadata types
+- [x] `MiniGame` interface and metadata types (timed in beats)
+- [x] Task and duration templates, registry, and author guide for teammates
+- [x] Minigame sandbox (`/sandbox.html`) to play one minigame with a metronome
 - [ ] Fire the Cannon (task)
 - [ ] Dodge the Kraken (duration)
 - [ ] Swab the Deck (task)
@@ -99,11 +101,8 @@ Run locally with `npm install` then `npm run dev`.
 ### Stretch goals
 - [ ] Song speed modifier (play a level faster for extra difficulty, timings scale with it)
 
-### Stretch minigames
-- [ ] Patch the Hull
-- [ ] Walk the Plank
-- [ ] Parrot Says
-- [ ] Parry!
+### Minigames
+The full minigame list, specs, and who's building what are tracked in [`MINIGAMES.md`](MINIGAMES.md). To build one, see [`src/minigames/README.md`](src/minigames/README.md).
 
 ## Team
 

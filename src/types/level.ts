@@ -14,6 +14,7 @@ export interface GameClip {
   start: number
   end: number
   difficulty: number
+  beatSync?: boolean // duration games that support it: time hazards to the beat. Ignored by task games
 }
 
 // Game track entries. Never overlap each other.

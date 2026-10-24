@@ -21,7 +21,7 @@ Think of each level like an osu! map: the song and how the map is charted set th
 |---|---|
 | Language | TypeScript (strict mode) |
 | Build / dev server | Vite (`npm run dev`) |
-| Game rendering | Phaser 3 |
+| Game rendering | Phaser 4 |
 | Audio | Web Audio API (`AudioContext`) |
 | Timeline waveform + clips | wavesurfer.js + Regions plugin |
 | Local storage | IndexedDB (via `idb`) for MP3s and level JSON |
@@ -35,31 +35,33 @@ Think of each level like an osu! map: the song and how the map is charted set th
 
 ## Minigame contract
 
-```ts
-type GameKind = "duration" | "task";
-type Status = "running" | "won" | "failed";
+Defined in `src/types/minigame.ts` (that file is the source of truth). In short:
 
-interface MiniGameMeta {
-  id: string;            // e.g. "swab_the_deck"
-  kind: GameKind;
-  prompt: string;        // short command flashed at start, e.g. "SWAB!"
-  baseDuration: number;  // seconds: one task cycle (task) or minimum length (duration)
-}
+```ts
+// MiniGameMeta = TaskMeta | DurationMeta, all with id, prompt, hint
+interface TaskMeta     { kind: "task"; baseBeats: number }                             // one task per cycle, always on the beat
+interface DurationMeta { kind: "duration"; minDuration: number; canBeatSync: boolean } // seconds; free timing unless synced
 
 interface MiniGame {
   meta: MiniGameMeta;
-  start(params: { duration: number; reps: number; difficulty: number }): void;
+  preload?(load: Phaser.Loader.LoaderPlugin): void;  // called once at boot
+  start(params: { scene: Phaser.Scene; startTime: number; duration: number; reps: number; bpm: number; beatSync: boolean; difficulty: number }): void;
   update(songTime: number): void;
-  handleInput(e: InputEvent): void;
-  status(): Status;
-  destroy(): void;
+  handleInput(input: GameInput): void;  // buttons (left/right/up/down/action) or pointer (x, y in 0..1), stamped with songTime
+  status(): "running" | "won" | "failed";
+  destroy(): void;       // must remove everything it added to the scene
 }
 ```
 
 ### Clip length rules
 
-- **Duration games** (survive until the end): `duration = clip.end - clip.start`. Must be at least `baseDuration`. Failing at any point loses a life; reaching the clip end is a win.
-- **Task games** (complete N tasks): clip length snaps to whole multiples of `baseDuration`. `reps = round(clipLength / baseDuration)`, minimum 1. Each rep must be completed within its time window.
+One beat is `60 / bpm` seconds.
+
+- **Duration games** (survive until the end): `duration = clip.end - clip.start`. Must be at least `minDuration` seconds. Failing at any point loses a life; reaching the clip end is a win. Timing is free unless the game has `canBeatSync` and the clip sets `beatSync: true`; then hazards follow the beat. Not every survival game supports sync.
+- **Task games** (complete N tasks, always on the beat, osu-style): clip length snaps to whole multiples of `baseBeats` beats. `reps = repsFor(meta, clipLength, bpm)` in `src/engine/clipRules.ts`, minimum 1. Each rep gets an equal `duration / reps` window and must be completed within it.
+- At clip end the engine calls `update(clip.end)` one last time, then reads `status()`, then calls `destroy()`. That last update lets a task game see its final window close.
+
+Templates, rules for minigame authors, and the registry live in `src/minigames/` (see its README.md).
 
 ## Level file format
 
@@ -72,6 +74,7 @@ interface MiniGame {
   "clips": [
     { "type": "buffer", "start": 0.0, "end": 4.0 },
     { "type": "game", "gameId": "fire_cannon", "start": 4.0, "end": 7.75, "difficulty": 1 },
+    { "type": "game", "gameId": "dodge_kraken", "start": 7.75, "end": 12.0, "difficulty": 1, "beatSync": true },
     { "type": "buffer", "start": 7.75, "end": 9.5 }
   ],
   "media": [
@@ -130,17 +133,7 @@ my_level.pwlevel
 
 ## Planned minigames
 
-Build the first three first; they cover every case the contract must handle.
-
-| Game | Kind | Mechanic | Priority |
-|---|---|---|---|
-| Fire the Cannon | task | Press on the beat when the fuse reaches the mark | 1 |
-| Dodge the Kraken | duration | Move left/right to avoid tentacle slams | 1 |
-| Swab the Deck | task | Scrub all grime spots before time runs out | 1 |
-| Patch the Hull | task | Plug leaks as they spring (whack-a-mole) | 2 |
-| Walk the Plank | duration | Keep a balance meter centered | 2 |
-| Parrot Says | task | Repeat the parrot's arrow sequence | 2 |
-| Parry! | task | Block sword strikes timed to the beat | 2 |
+The full list, specs, and owners are in `MINIGAMES.md` (source of truth). Build the priority 1 games first (Fire the Cannon, Swab the Deck, Dodge the Kraken); they cover every case the contract must handle. A teammate may be building minigames in parallel, so do not edit a minigame folder someone else owns.
 
 ## Build order
 
@@ -158,11 +151,15 @@ Build the first three first; they cover every case the contract must handle.
 public/
   assets/sprites/  # Piskel art, served as static URLs (e.g. /assets/sprites/idle_character/pirate.png)
     floortiles/ idle_character/ jumping_character/ mousecursor/
+  assets/minigames/<game_id>/  # each minigame's own art and sounds
+  assets/audio/    # songs and sfx (only *_sfx* and *_default* files are committed)
 src/
   main.ts
   audio/        # AudioClock, MP3 loading, hashing
   engine/       # LevelRunner, lives, game over, buffer zones
-  minigames/    # one folder per minigame, each implementing MiniGame
+  minigames/    # one folder per minigame, _template_task/, _template_duration/, registry.ts
+  sandbox/      # minigame sandbox (sandbox.html): play one minigame with a metronome clock
+  debug/        # build step 1 debug page (temporary)
   editor/       # timeline editor UI
   storage/      # IndexedDB helpers
   types/        # shared types (MiniGame, Level, Clip)
@@ -170,4 +167,4 @@ src/
 
 ## Current status
 
-Build step 1 done: `AudioClock`, level types, `LevelRunner` (update, seek) with Vitest tests, and a debug page (`src/debug/DebugPage.ts`) that main.ts mounts for now. Next step: build order step 2, starting with the `MiniGame` interface in `src/types/minigame.ts`.
+Build step 1 done: `AudioClock`, level types, `LevelRunner` (update, seek) with Vitest tests, and a debug page (`src/debug/DebugPage.ts`) that main.ts mounts for now. Build step 2 in progress: `MiniGame` contract (`src/types/minigame.ts`), `repsFor`, keyboard input mapping, minigame templates and registry, `MINIGAMES.md`, and the minigame sandbox are done. A teammate is building the minigames themselves from `MINIGAMES.md`. Next for us: the timeline editor (build step 4).
