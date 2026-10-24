@@ -170,4 +170,4 @@ src/
 
 ## Current status
 
-Not started. Next step: Build order step 1, starting with the `AudioClock` (load an uploaded MP3 and report accurate song time).
+Build step 1 done: `AudioClock`, level types, `LevelRunner` (update, seek) with Vitest tests, and a debug page (`src/debug/DebugPage.ts`) that main.ts mounts for now. Next step: build order step 2, starting with the `MiniGame` interface in `src/types/minigame.ts`.
