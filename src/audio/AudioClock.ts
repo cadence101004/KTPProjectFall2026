@@ -10,7 +10,7 @@ export class AudioClock {
   private startOffset = 0
 
   // Decodes an uploaded MP3 into memory so it can be started with sample-accurate timing.
-  async load(file: File): Promise<void> {
+  async load(file: Blob): Promise<void> {
     const bytes = await file.arrayBuffer()
     this.buffer = await this.ctx.decodeAudioData(bytes)
   }
