@@ -2,9 +2,9 @@ import Phaser from 'phaser'
 import '../style.css'
 import './sandbox.css'
 import { listenForKeys } from '../engine/input'
+import { allGames } from '../minigames/allGames'
 import { MetronomeClock } from './MetronomeClock'
 import { SandboxScene } from './SandboxScene'
-import { sandboxGames } from './sandboxGames'
 
 // Minigame sandbox: play any one minigame on its own, with a metronome standing in for the song.
 const app = document.querySelector<HTMLDivElement>('#app')!
@@ -12,7 +12,7 @@ app.innerHTML = `
   <div class="sandbox">
     <h1>Minigame sandbox</h1>
     <div class="controls">
-      <label>Game <select id="game">${Object.keys(sandboxGames).map(id => `<option>${id}</option>`).join('')}</select></label>
+      <label>Game <select id="game">${Object.keys(allGames).map(id => `<option>${id}</option>`).join('')}</select></label>
       <label>BPM <input id="bpm" type="number" min="40" max="300" value="120" /></label>
       <label>Length (s) <input id="length" type="number" min="1" max="60" step="0.5" value="8" /></label>
       <label>Difficulty <input id="difficulty" type="number" min="1" max="5" value="1" /></label>

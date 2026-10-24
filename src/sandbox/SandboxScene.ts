@@ -1,8 +1,8 @@
 import Phaser from 'phaser'
 import { repsFor } from '../engine/clipRules'
+import { allGames } from '../minigames/allGames'
 import type { GameInput, MiniGame, MiniGameParams } from '../types/minigame'
 import type { MetronomeClock } from './MetronomeClock'
-import { sandboxGames } from './sandboxGames'
 
 const COUNT_IN_BEATS = 4 // one bar of clicks before the clip starts
 
@@ -29,7 +29,7 @@ export class SandboxScene extends Phaser.Scene {
   }
 
   preload(): void {
-    for (const make of Object.values(sandboxGames)) make().preload?.(this.load)
+    for (const make of Object.values(allGames)) make().preload?.(this.load)
   }
 
   create(): void {
@@ -48,7 +48,7 @@ export class SandboxScene extends Phaser.Scene {
     this.current?.destroy()
     this.current = null
 
-    const game = sandboxGames[run.id]()
+    const game = allGames[run.id]()
     const meta = game.meta
     const beatLength = 60 / run.bpm
     const duration =

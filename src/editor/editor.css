@@ -28,8 +28,29 @@
 }
 
 .editor #status,
-.editor .help {
+.editor .help,
+.editor .selection {
   margin: 0;
+}
+
+.editor .palette {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.editor .palette .danger {
+  margin-left: auto;
+  color: #ff8a8a;
+}
+
+.editor input[type='number'] {
+  width: 4.5rem;
+}
+
+.editor .selection {
+  font-variant-numeric: tabular-nums;
 }
 
 .editor .help {

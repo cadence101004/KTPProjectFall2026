@@ -70,6 +70,7 @@ Templates, rules for minigame authors, and the registry live in `src/minigames/`
   "title": "Kraken's Lullaby",
   "audioHash": "sha256-of-the-mp3",
   "bpm": 128,
+  "beatOffset": 0.12,
   "countdownRate": 1.25,
   "clips": [
     { "type": "buffer", "start": 0.0, "end": 4.0 },
@@ -140,7 +141,7 @@ The full list, specs, and owners are in `MINIGAMES.md` (source of truth). Build 
 1. **Audio clock + level runner**: load an MP3, play it, report song time, and step through a hardcoded level JSON, switching clips at the right times.
 2. **Minigame contract + first 3 minigames**.
 3. **Lives system, buffer zones, Game Over flow** (Restart Level / Main Menu).
-4. **Timeline editor**: MP3 upload, waveform, scrub/play from playhead, drag to move clips, drag edges to resize (task games snap to `baseDuration` multiples), beat-grid snapping, save/load levels to IndexedDB.
+4. **Timeline editor**: MP3 upload, waveform, scrub/play from playhead, drag to move clips, drag edges to resize (task games snap to whole `baseBeats` cycles), beat-grid snapping, save/load levels to IndexedDB, and a **preview viewer** that plays the level from the playhead in the real gameplay view (same runtime as the game, not a mock-up) so designers see exactly what players will see.
 5. **Media track**: background images and video behind minigames, frosted cover effects, video synced to the audio clock, and a media track in the editor.
 6. **Level packs**: export and import `.pwlevel` zips (see Level packs above).
 7. **Polish**: latency calibration, score and end-of-level rank, practice mode (infinite lives), undo/redo, in-editor minigame preview, keyboard + touch + gamepad input.

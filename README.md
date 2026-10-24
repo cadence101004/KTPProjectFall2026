@@ -69,12 +69,13 @@ Run locally with `npm install` then `npm run dev`.
 - [ ] Game Over screen with Restart Level and Main Menu
 
 ### 4. Timeline editor
-- [ ] MP3 upload and waveform display
-- [ ] Scrub and play from playhead
-- [ ] Drag to move clips, drag edges to resize
-- [ ] Task games snap to `baseDuration` multiples
+- [x] MP3 upload and waveform display
+- [x] Scrub and play from playhead
+- [x] Drag to move clips, drag edges to resize
+- [x] Task games snap to whole `baseBeats` cycles
 - [ ] Beat grid snapping
 - [ ] Save and load levels in IndexedDB
+- [ ] Preview viewer: play the level from the playhead in a gameplay view, to see what players will see
 
 ### 5. Media track (backgrounds)
 - [ ] Image and video clips on their own track behind the minigames
