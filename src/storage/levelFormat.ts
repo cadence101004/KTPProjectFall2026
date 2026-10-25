@@ -15,8 +15,21 @@ export function normalizeLevel(raw: unknown): Level {
     beatOffset: typeof data.beatOffset === 'number' && data.beatOffset >= 0 ? data.beatOffset : 0,
     ...(typeof data.countdownRate === 'number' ? { countdownRate: data.countdownRate } : {}),
     clips,
-    media: Array.isArray(data.media) ? (data.media as MediaClip[]) : [],
+    media: (Array.isArray(data.media) ? data.media : []).filter(isValidMedia).sort((a, b) => a.start - b.start),
+    ...(typeof data.mediaEnabled === 'boolean' ? { mediaEnabled: data.mediaEnabled } : {}),
   }
+}
+
+function isValidMedia(clip: unknown): clip is MediaClip {
+  if (typeof clip !== 'object' || clip === null) return false
+  const c = clip as Partial<MediaClip>
+  if (c.kind !== 'image' && c.kind !== 'video') return false
+  if (typeof c.mediaHash !== 'string' || typeof c.start !== 'number' || typeof c.end !== 'number') return false
+  if (!(c.end > c.start)) return false
+  c.src = typeof c.src === 'string' ? c.src : ''
+  c.mediaOffset = typeof c.mediaOffset === 'number' && c.mediaOffset >= 0 ? c.mediaOffset : 0
+  c.effects = { blur: Number(c.effects?.blur) || 0, dim: Math.min(1, Math.max(0, Number(c.effects?.dim) || 0)) }
+  return true
 }
 
 function isValidClip(clip: unknown): clip is Clip {

@@ -46,4 +46,5 @@ export interface Level {
   countdownRate?: number // manual 321GO speed; absent means auto from bpm
   clips: Clip[]
   media: MediaClip[]
+  mediaEnabled?: boolean // the media track's on/off switch. Absent means on
 }

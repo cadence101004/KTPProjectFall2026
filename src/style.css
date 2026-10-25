@@ -93,3 +93,27 @@ canvas {
   font-family: ui-monospace, monospace;
   font-size: 0.85rem;
 }
+
+/* Game view: the Phaser canvas is transparent, with the level's media track (MediaLayer) layered behind it. */
+.stage {
+  position: relative;
+  overflow: hidden;
+}
+
+.stage canvas {
+  position: relative;
+  z-index: 1;
+}
+
+.media-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
+
+div.media-layer {
+  background: #000; /* the dim half of the frosted cover; its opacity is the clip's dim */
+}

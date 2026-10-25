@@ -30,6 +30,21 @@ describe('normalizeLevel', () => {
     expect(level.clips).toHaveLength(1)
   })
 
+  it('keeps valid media clips, fills in missing effects, and drops broken ones', () => {
+    const level = normalizeLevel({
+      clips: [],
+      mediaEnabled: false,
+      media: [
+        { kind: 'video', src: 'intro.mp4', mediaHash: 'abc', start: 0, end: 8 },
+        { kind: 'gif', mediaHash: 'x', start: 0, end: 1 }, // unknown kind
+        { kind: 'image', start: 0, end: 1 }, // no hash
+      ],
+    })
+    expect(level.media).toHaveLength(1)
+    expect(level.media[0].effects).toEqual({ blur: 0, dim: 0 })
+    expect(level.mediaEnabled).toBe(false)
+  })
+
   it('rejects data that is not a level', () => {
     expect(() => normalizeLevel('hello')).toThrow()
     expect(() => normalizeLevel({ title: 'no clips' })).toThrow()

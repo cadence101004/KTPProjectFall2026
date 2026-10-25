@@ -1,20 +1,20 @@
-import Phaser from 'phaser'
 import '../style.css'
 import './editor.css'
 import { AudioClock } from '../audio/AudioClock'
 import { hashFile } from '../audio/hash'
-import { findOnsets } from '../audio/onsets'
 import { defaultHits, hitTimes, repsFor, usesBeatMap } from '../engine/clipRules'
-import { countdownBeats } from '../engine/countdown'
+import { createGameView, loadCountdownSound } from '../engine/gameView'
 import { listenForKeys } from '../engine/input'
 import { LevelScene } from '../engine/LevelScene'
+import { MediaLayer } from '../engine/MediaLayer'
 import { allGames, metaFor } from '../minigames/allGames'
-import { loadGameFont } from '../minigames/shared/font'
-import { listLevels, loadLevel, loadSong, saveLevel, saveSong } from '../storage/db'
-import type { Clip, GameClip, Level } from '../types/level'
+import { listLevels, loadLevel, loadSong, saveLevel, saveMedia, saveSong } from '../storage/db'
+import { loadMediaFiles, type MediaFile, mediaUrls } from '../storage/mediaFiles'
+import type { Clip, GameClip, Level, MediaClip } from '../types/level'
 import type { MiniGameMeta } from '../types/minigame'
 import { type BeatGrid, beatTimes, snapToGrid } from './beatGrid'
-import { placeMove, placeResize, snapLength } from './clipEditing'
+import { freeGaps, placeMove, placeResize, snapLength } from './clipEditing'
+import { cutMedia } from './mediaEditing'
 import { computePeaks } from './peaks'
 import { previewStart } from './preview'
 import { type ClipView, Timeline } from './Timeline'
@@ -53,6 +53,14 @@ app.innerHTML = `
     <p id="status">Pick a song to start a level, or load a saved one.</p>
     <div id="stage" class="stage"></div>
     <div id="waveform" class="waveform"></div>
+    <div class="media-controls">
+      <b>Media track</b>
+      <label title="Turns the whole media track on or off in the game"><input id="mediaOn" type="checkbox" checked /> On</label>
+      <label class="file-button">Add video or image at playhead<input id="mediaFile" type="file" accept="video/*,image/*" /></label>
+      <button id="cutMedia" title="Split the media clip under the playhead into two pieces (C)">Cut at playhead</button>
+      <span id="mediaInfo"></span>
+    </div>
+    <div id="mediaOptions" class="media-options"></div>
     <div class="palette">
       <span>Add at playhead:</span>
       <button data-add="">Buffer</button>
@@ -64,7 +72,8 @@ app.innerHTML = `
     <p class="help">Drag the yellow handle in the bar above the waveform to move the playhead (works mid-preview too),
       or click empty waveform. Space plays and pauses. Drag a clip to move it,
       drag its edges to resize. Delete removes the selected clip. Set BPM and the first beat so the grid lines
-      land on the drums; clip edges then snap to the grid. Ctrl+S saves. Preview (P) plays the level as a player
+      land on the drums; clip edges then snap to the grid. Cut (C) splits the media under the playhead so each
+      piece can have its own blur and dim. Ctrl+S saves. Preview (P) plays the level as a player
       sees it, with the game controls live; Esc stops it.</p>
   </div>`
 
@@ -75,23 +84,12 @@ const clock = new AudioClock()
 const timeline = new Timeline($('waveform'))
 const levelScene = new LevelScene(clock)
 
-// Phaser starts once the game font is ready, so its text never gets stuck in a fallback font.
-void loadGameFont().then(
-  () =>
-    new Phaser.Game({
-      type: Phaser.AUTO,
-      parent: 'stage',
-      width: 480,
-      height: 270,
-      backgroundColor: '#123047',
-      pixelArt: true,
-      scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-      scene: [levelScene],
-    }),
-)
+void createGameView('stage', levelScene)
+void loadCountdownSound(clock, levelScene)
 
 // In the editor, Restart replays the preview from where it began, and Main Menu goes back to editing.
 let previewOrigin = 0
+levelScene.setIdleText('Press Preview to play the level')
 levelScene.setPractice(true)
 levelScene.setGameOverOptions([
   {
@@ -104,19 +102,6 @@ levelScene.setGameOverOptions([
   },
   { label: 'Main Menu', action: () => pause() },
 ])
-
-// Loads the 321GO sound and finds its four counts so the countdown can line them up with the beat.
-async function loadCountdown(): Promise<void> {
-  try {
-    const buffer = await clock.loadSfx('/assets/audio/321GO_sfx.mp3')
-    const beats = countdownBeats(findOnsets(buffer.getChannelData(0), buffer.sampleRate), buffer.duration)
-    console.info('321GO counts found at', beats.map(b => b.toFixed(2)).join(', '), 's into the file')
-    levelScene.setCountdownSound({ buffer, beats })
-  } catch {
-    console.warn('Could not load the 321GO sound; buffers will play without a countdown.')
-  }
-}
-void loadCountdown()
 
 function newLevel(audioHash = ''): Level {
   return { title: 'Untitled level', audioHash, bpm: 120, beatOffset: 0, clips: [], media: [] }
@@ -133,6 +118,9 @@ let playing = false
 let previewing = false // playing with the level running in the gameplay view and game controls live
 let playhead = 0 // song time while paused; while playing, the clock is the truth
 let selected = -1 // index of the selected clip, or -1
+let selectedMedia = -1 // index of the selected media clip, or -1 (only one of the two is ever selected)
+const mediaFiles = new Map<string, MediaFile>() // media files this session knows about, by mediaHash
+const mediaLayer = new MediaLayer($('stage'), currentTime, () => playing) // shows the frame under the playhead too
 
 function setStatus(text: string): void {
   $('status').textContent = text
@@ -258,6 +246,154 @@ function render(): void {
     ? `${viewOf(clip, selected).label}: ${clip.start.toFixed(2)} s to ${clip.end.toFixed(2)} s (${(clip.end - clip.start).toFixed(2)} s)`
     : 'No clip selected.'
   renderClipOptions(clip)
+  renderMedia()
+}
+
+// The media track: lane blocks, the on/off switch, the live background layer, and the selected clip's settings.
+function renderMedia(): void {
+  const on = level.mediaEnabled !== false
+  timeline.showMedia(
+    level.media.map((clip, index) => ({ start: clip.start, end: clip.end, label: clip.src || clip.kind, selected: index === selectedMedia })),
+  )
+  $<HTMLInputElement>('mediaOn').checked = on
+  document.querySelector('.media-lane')?.classList.toggle('off', !on)
+  mediaLayer.setMedia(level.media, mediaUrls(mediaFiles), on)
+  const missing = level.media.filter(clip => !mediaFiles.has(clip.mediaHash)).length
+  $('mediaInfo').textContent = missing ? `${missing} media file${missing === 1 ? '' : 's'} not in this browser` : ''
+  renderMediaOptions(level.media[selectedMedia])
+}
+
+// Settings for the selected media clip. Sliders update the clip directly; the media layer redraws every
+// frame, so changes show live in the gameplay view.
+function renderMediaOptions(clip: MediaClip | undefined): void {
+  const panel = $('mediaOptions')
+  panel.replaceChildren()
+  if (!clip) return
+  const field = (label: string, input: HTMLInputElement) => {
+    const wrap = document.createElement('label')
+    wrap.append(`${label} `, input)
+    return wrap
+  }
+  const input = (type: string, value: number, min: string, step: string, max = '') => {
+    const element = document.createElement('input')
+    element.type = type
+    element.min = min
+    element.step = step
+    if (max) element.max = max
+    element.value = String(value)
+    return element
+  }
+
+  const blur = input('range', clip.effects.blur, '0', '1', '20')
+  blur.addEventListener('input', () => (clip.effects.blur = Number(blur.value)))
+  const dim = input('range', clip.effects.dim, '0', '0.05', '1')
+  dim.addEventListener('input', () => (clip.effects.dim = Number(dim.value)))
+
+  const length = input('number', +(clip.end - clip.start).toFixed(2), '0.25', '0.25')
+  length.addEventListener('change', () => {
+    const index = level.media.indexOf(clip)
+    const span = placeResize(level.media, index, 'end', clip.start + Number(length.value), null, level.bpm, songLength)
+    if (span) clip.end = span.end
+    render()
+  })
+  const offset = input('number', clip.mediaOffset, '0', '0.5')
+  offset.disabled = clip.kind !== 'video'
+  offset.addEventListener('change', () => {
+    clip.mediaOffset = Math.max(0, Number(offset.value) || 0)
+    render()
+  })
+
+  const remove = Object.assign(document.createElement('button'), { textContent: 'Delete media', className: 'danger' })
+  remove.addEventListener('click', deleteSelected)
+  panel.append(
+    Object.assign(document.createElement('b'), { textContent: clip.src || clip.kind }),
+    field('Blur', blur),
+    field('Dim', dim),
+    field('Length (s)', length),
+    field('Video starts at (s)', offset),
+    remove,
+  )
+}
+
+// Adds a video or image to the media track at the playhead, as long as the video (or 8 s for an image),
+// cut short if it would run into the next media clip or the end of the song.
+async function addMedia(file: File): Promise<void> {
+  if (songLength === 0) {
+    setStatus('Load a song before adding media.')
+    return
+  }
+  const kind = file.type.startsWith('image/') ? 'image' : 'video'
+  const hash = await hashFile(file)
+  const url = mediaFiles.get(hash)?.url ?? URL.createObjectURL(file)
+  mediaFiles.set(hash, { name: file.name, file, url })
+  const wanted = kind === 'video' ? await videoLength(url) : 8
+  const at = snapToGrid(playhead, grid())
+  const gap = freeGaps(level.media, -1, songLength).find(g => at >= g.start - 1e-6 && at < g.end)
+  if (!gap) {
+    setStatus('There is already media at the playhead. Move the playhead to an empty part of the media track.')
+    return
+  }
+  const start = Math.max(at, gap.start)
+  const clip: MediaClip = {
+    kind,
+    src: file.name,
+    mediaHash: hash,
+    start,
+    end: Math.min(start + wanted, gap.end),
+    mediaOffset: 0,
+    effects: { blur: 8, dim: 0.4 },
+  }
+  level.media.push(clip)
+  level.media.sort((a, b) => a.start - b.start)
+  selectedMedia = level.media.indexOf(clip)
+  selected = -1
+  render()
+}
+
+// A video file's length in seconds (8 if the browser can't tell).
+function videoLength(url: string): Promise<number> {
+  return new Promise(resolve => {
+    const probe = document.createElement('video')
+    probe.preload = 'metadata'
+    probe.onloadedmetadata = () => resolve(Number.isFinite(probe.duration) ? probe.duration : 8)
+    probe.onerror = () => resolve(8)
+    probe.src = url
+  })
+}
+
+// Applies a drag on the media lane, keeping media clips from overlapping (snaps back if there's no room).
+function moveMedia(index: number, start: number): void {
+  const clip = level.media[index]
+  const span = placeMove(level.media, index, snapToGrid(start, grid()), clip.end - clip.start, songLength)
+  if (span) {
+    clip.start = span.start
+    clip.end = span.end
+  }
+  level.media.sort((a, b) => a.start - b.start)
+  selectedMedia = level.media.indexOf(clip)
+  render()
+}
+
+// Splits the media clip under the playhead in two (snapped to the beat grid), so each piece can get its
+// own blur and dim, or be deleted to cut a scene out. The second piece is selected afterwards.
+function cutMediaAtPlayhead(): void {
+  const at = snapToGrid(currentTime(), grid())
+  const index = level.media.findIndex(clip => at > clip.start && at < clip.end)
+  const pieces = index === -1 ? null : cutMedia(level.media[index], at)
+  if (!pieces) {
+    setStatus('Put the playhead inside a media clip (not right at its edge) to cut it.')
+    return
+  }
+  level.media.splice(index, 1, ...pieces)
+  selectedMedia = index + 1
+  selected = -1
+  render()
+}
+
+function selectMedia(index: number): void {
+  selectedMedia = index
+  selected = -1
+  render()
 }
 
 // Settings for the selected clip: the beat sync toggle (duration games that support it) and the beat map grid.
@@ -399,6 +535,12 @@ function changeOffset(offset: number): void {
 }
 
 function deleteSelected(): void {
+  if (level.media[selectedMedia]) {
+    level.media.splice(selectedMedia, 1)
+    selectedMedia = -1
+    render()
+    return
+  }
   if (!level.clips[selected]) return
   endPreview()
   level.clips.splice(selected, 1)
@@ -406,7 +548,7 @@ function deleteSelected(): void {
   render()
 }
 
-// Decodes a song and draws it. Leaves the level's clips alone.
+// Decodes a song and draws it, and loads any stored media the level uses. Leaves the level's clips alone.
 async function openSong(file: Blob, name: string): Promise<void> {
   if (playing) pause()
   setStatus(`Loading ${name}...`)
@@ -416,6 +558,10 @@ async function openSong(file: Blob, name: string): Promise<void> {
   songLength = buffer.duration
   playhead = 0
   selected = -1
+  selectedMedia = -1
+  for (const [hash, media] of await loadMediaFiles(level.media.filter(clip => !mediaFiles.has(clip.mediaHash)))) {
+    mediaFiles.set(hash, media)
+  }
   await timeline.show(computePeaks(buffer.getChannelData(0), buffer.sampleRate), songLength)
   $('length').textContent = songLength.toFixed(2)
   playButton.disabled = false
@@ -460,6 +606,10 @@ async function save(): Promise<void> {
   }
   level.title = $<HTMLInputElement>('title').value.trim() || 'Untitled level'
   await saveSong(level.audioHash, song.name, song.file)
+  for (const hash of new Set(level.media.map(clip => clip.mediaHash))) {
+    const media = mediaFiles.get(hash)
+    if (media) await saveMedia(hash, media.name, media.file)
+  }
   await saveLevel(levelId, level)
   await refreshLevelList(levelId)
   setStatus(`Saved "${level.title}".`)
@@ -489,6 +639,7 @@ function startNewLevel(): void {
   levelId = crypto.randomUUID()
   waitingForSong = null
   selected = -1
+  selectedMedia = -1
   syncInputs()
   drawGrid()
   render()
@@ -540,7 +691,20 @@ listenForKeys(clock, input => {
 timeline.onSeek(seek)
 timeline.onScrub(scrub)
 timeline.onClipEdit(editClip)
+timeline.onMediaEdit(selectMedia, moveMedia)
+$('cutMedia').addEventListener('click', cutMediaAtPlayhead)
+$<HTMLInputElement>('mediaOn').addEventListener('change', event => {
+  level.mediaEnabled = (event.target as HTMLInputElement).checked
+  render()
+})
+$<HTMLInputElement>('mediaFile').addEventListener('change', event => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = '' // so picking the same file again still fires
+  if (file) void addMedia(file)
+})
 timeline.onClipClick(index => {
+  selectedMedia = -1
   selected = index
   render()
 })
@@ -574,7 +738,9 @@ window.addEventListener('keydown', event => {
     if (event.code === 'Escape') pause()
     return
   }
-  if (event.code === 'KeyP') {
+  if (event.code === 'KeyC' && !event.ctrlKey && !event.metaKey) {
+    cutMediaAtPlayhead()
+  } else if (event.code === 'KeyP') {
     void startPreview()
   } else if (event.code === 'Space') {
     event.preventDefault()

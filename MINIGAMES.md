@@ -10,9 +10,9 @@ Every minigame we plan to build. Claim one by putting your name in **Owner**, th
 
 | Done | Game | ID | Kind | Beat sync | Priority | Owner |
 |---|---|---|---|---|---|---|
-| [ ] | Fire the Cannon | `fire_cannon` | task | always | 1 | |
-| [ ] | Swab the Deck | `swab_the_deck` | task | always | 1 | |
-| [ ] | Dodge the Kraken | `dodge_kraken` | duration | optional | 1 | |
+| [ ] | Fire the Cannon | `fire_cannon` | task | always | 1 | Connor |
+| [ ] | Swab the Deck | `swab_the_deck` | task | always | 1 | Connor |
+| [ ] | Dodge the Kraken | `dodge_kraken` | duration | optional | 1 | Connor |
 | [ ] | Patch the Hull | `patch_the_hull` | task | always | 2 | Cole |
 | [ ] | Parrot Says | `parrot_says` | task | always | 2 | |
 | [ ] | Parry! | `parry` | task | always | 2 | |

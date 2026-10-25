@@ -80,11 +80,12 @@ Run locally with `npm install` then `npm run dev`.
 - [x] Scrub bar above the waveform
 
 ### 5. Media track (backgrounds)
-- [ ] Image and video clips on their own track behind the minigames
-- [ ] Frosted cover effect (blur + dim) per media clip
-- [ ] Video playback synced to the audio clock (muted, drift-corrected)
-- [ ] Media track in the editor: add, move, resize, set effects
-- [ ] Missing or broken media falls back to the default background
+- [x] Image and video clips on their own track behind the minigames
+- [x] Frosted cover effect (blur + dim) per media clip
+- [x] Video playback synced to the audio clock (muted, drift-corrected)
+- [x] Media track in the editor: add, move, cut into pieces, set effects, on/off switch
+- [ ] Drag media edges to resize (use Length or cut + delete for now)
+- [x] Missing or broken media falls back to the default background
 
 ### 6. Level packs (sharing)
 - [ ] Export a level as a `.pwlevel` zip (level JSON, custom minigames, optional MP3 and media)

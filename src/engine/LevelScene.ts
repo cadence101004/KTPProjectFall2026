@@ -42,12 +42,19 @@ export class LevelScene extends Phaser.Scene {
   private gameOverOptions: MenuOption[] = []
   private gameOver: { objects: Phaser.GameObjects.GameObject[]; buttons: Phaser.GameObjects.Text[]; choice: number } | null =
     null
+  private idleText = 'Press Start' // shown while no level is playing
   private hud!: Phaser.GameObjects.Text // lives, top left
   private banner!: Phaser.GameObjects.Text // big center text: buffer info, prompts, results
 
   constructor(clock: LevelClock) {
     super('level')
     this.clock = clock
+  }
+
+  // The message shown while nothing is playing, worded for the host page (e.g. "Press Preview...").
+  setIdleText(text: string): void {
+    this.idleText = text
+    if (this.banner && !this.running) this.banner.setText(text)
   }
 
   // Without a countdown sound, buffers still work; they just skip the 321GO cue.
@@ -73,7 +80,7 @@ export class LevelScene extends Phaser.Scene {
   create(): void {
     this.hud = this.add.text(8, 8, '', textStyle(14)).setDepth(1000)
     this.banner = this.add
-      .text(this.scale.width / 2, this.scale.height / 2, 'Press Preview to play the level', textStyle(18, { align: 'center' }))
+      .text(this.scale.width / 2, this.scale.height / 2, this.idleText, textStyle(18, { align: 'center' }))
       .setOrigin(0.5)
       .setDepth(1000)
     for (const phase of ['down', 'move', 'up'] as const) {
@@ -107,7 +114,7 @@ export class LevelScene extends Phaser.Scene {
     this.running = false
     this.runner = null
     this.countdown = null
-    this.banner.setText('Press Preview to play the level')
+    this.banner.setText(this.idleText)
     this.hud.setText('')
   }
 

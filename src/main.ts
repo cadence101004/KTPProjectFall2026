@@ -1,9 +1,9 @@
 import './style.css'
 import './home.css'
 
-// Home menu. Each section is its own page for now; Play joins once the level player has a menu of its own.
+// Home menu. Each section is its own page.
 const sections = [
-  { href: '', title: 'Play', blurb: 'Pick a level and set sail. Coming soon.', disabled: true },
+  { href: '/play.html', title: 'Play', blurb: 'Pick a level and set sail.', disabled: false },
   { href: '/editor.html', title: 'Level Editor', blurb: 'Chart minigames to your own songs, then preview them.' },
   { href: '/sandbox.html', title: 'Minigame Sandbox', blurb: 'Try one minigame on its own with a metronome.' },
   { href: '/debug.html', title: 'Debug', blurb: 'The step 1 test page: clip timing against a song.' },

@@ -105,7 +105,7 @@
   width: min(100%, 720px);
   aspect-ratio: 16 / 9;
   align-self: center;
-  background: #000;
+  background: #123047;
 }
 
 .editor .ruler {
@@ -140,4 +140,76 @@
   background: #0f2436;
   border-radius: 6px;
   min-height: 120px;
+}
+
+/* Media track: the lane under the waveform, plus its toolbar and the selected clip's settings. */
+.editor .media-lane {
+  height: 34px;
+  overflow: hidden;
+  background: #0b1a2a;
+  border: 1px solid #1d3a52;
+  border-radius: 0 0 6px 6px;
+  margin-top: -12px; /* tuck against the waveform above */
+}
+
+.editor .media-lane.off {
+  opacity: 0.35;
+}
+
+.editor .media-track {
+  position: relative;
+  height: 100%;
+  min-width: 100%;
+}
+
+.editor .media-block {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  box-sizing: border-box;
+  padding: 0 6px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  line-height: 26px;
+  color: #fff;
+  background: rgba(180, 110, 255, 0.45);
+  border: 1px solid rgba(200, 150, 255, 0.8);
+  border-radius: 4px;
+  cursor: grab;
+  touch-action: none;
+}
+
+.editor .media-block.selected {
+  background: rgba(180, 110, 255, 0.75);
+  border-color: #ffcc4d;
+}
+
+.editor .media-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #ffcc4d;
+  pointer-events: none;
+}
+
+.editor .media-controls,
+.editor .media-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.editor .file-button {
+  padding: 6px 16px;
+  border: 1px solid #6fa8c9;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.editor .file-button input {
+  display: none;
 }

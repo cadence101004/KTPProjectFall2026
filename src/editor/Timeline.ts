@@ -12,6 +12,14 @@ export interface ClipView {
   hits: number[] // beat map dots, as fractions (0..1) of the way through the clip
 }
 
+// How one media clip looks on the media lane.
+export interface MediaView {
+  start: number
+  end: number
+  label: string
+  selected: boolean
+}
+
 // The editor's waveform strip. wavesurfer only draws; playback always goes through AudioClock,
 // so what you hear in the editor is timed exactly like the game.
 export class Timeline {
@@ -21,9 +29,21 @@ export class Timeline {
   private readonly grid: HTMLDivElement
   private readonly rulerTrack: HTMLDivElement // scrolls and zooms with the waveform
   private readonly knob: HTMLDivElement
+  private readonly mediaTrack: HTMLDivElement // the media lane under the waveform; scrolls and zooms with it
+  private readonly mediaPlayhead: HTMLDivElement
   private duration = 0
 
   constructor(container: HTMLElement) {
+    // Media lane below the waveform: the second track, holding background videos and images.
+    const lane = document.createElement('div')
+    lane.className = 'media-lane'
+    this.mediaTrack = document.createElement('div')
+    this.mediaTrack.className = 'media-track'
+    this.mediaPlayhead = document.createElement('div')
+    this.mediaPlayhead.className = 'media-playhead'
+    lane.append(this.mediaTrack)
+    container.after(lane)
+
     // Scrub bar above the waveform. Normal page DOM (outside wavesurfer), so editor.css styles it.
     const ruler = document.createElement('div')
     ruler.className = 'ruler'
@@ -96,8 +116,53 @@ export class Timeline {
     const position = `${(time / this.duration) * 100}%`
     this.playhead.style.left = position
     this.knob.style.left = position
-    this.rulerTrack.style.width = `${this.waves.getWrapper().offsetWidth}px`
-    this.rulerTrack.style.transform = `translateX(${-this.waves.getScroll()}px)`
+    this.mediaPlayhead.style.left = position
+    for (const track of [this.rulerTrack, this.mediaTrack]) {
+      track.style.width = `${this.waves.getWrapper().offsetWidth}px`
+      track.style.transform = `translateX(${-this.waves.getScroll()}px)`
+    }
+  }
+
+  // Redraws the media lane's blocks. Each block's index matches its media clip.
+  showMedia(clips: MediaView[]): void {
+    if (this.duration === 0) return
+    const blocks = clips.map((clip, index) => {
+      const block = document.createElement('div')
+      block.className = clip.selected ? 'media-block selected' : 'media-block'
+      block.dataset.index = String(index)
+      block.style.left = `${(clip.start / this.duration) * 100}%`
+      block.style.width = `${((clip.end - clip.start) / this.duration) * 100}%`
+      block.textContent = clip.label
+      return block
+    })
+    this.mediaTrack.replaceChildren(...blocks, this.mediaPlayhead)
+  }
+
+  // Clicking a media block selects it; dragging it moves it. `move` gets the dropped start time, before
+  // any no-overlap rules (the editor applies those).
+  onMediaEdit(select: (index: number) => void, move: (index: number, start: number) => void): void {
+    let drag: { index: number; block: HTMLElement; startX: number; startLeft: number; moved: boolean } | null = null
+    const secondsPerPixel = () => this.duration / this.mediaTrack.getBoundingClientRect().width
+    this.mediaTrack.addEventListener('pointerdown', event => {
+      const block = (event.target as HTMLElement).closest<HTMLElement>('.media-block')
+      if (!block) return
+      const index = Number(block.dataset.index)
+      drag = { index, block, startX: event.clientX, startLeft: block.offsetLeft, moved: false }
+      this.mediaTrack.setPointerCapture(event.pointerId)
+      select(index)
+    })
+    this.mediaTrack.addEventListener('pointermove', event => {
+      if (!drag) return
+      const dx = event.clientX - drag.startX
+      if (Math.abs(dx) > 3) drag.moved = true
+      if (drag.moved) drag.block.style.left = `${drag.startLeft + dx}px` // live preview while dragging
+    })
+    this.mediaTrack.addEventListener('pointerup', event => {
+      if (!drag) return
+      const { index, startLeft, startX, moved } = drag
+      drag = null
+      if (moved) move(index, (startLeft + event.clientX - startX) * secondsPerPixel())
+    })
   }
 
   // Dragging on the scrub bar. Calls back with the time under the pointer when the drag starts, as it

@@ -1,0 +1,114 @@
+.play {
+  width: min(960px, calc(100% - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.play header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.play h1 {
+  margin: 0;
+  font-size: 2rem;
+  color: #ffcc4d;
+}
+
+.play a {
+  color: #ffcc4d;
+}
+
+.play .home-link {
+  text-decoration: none;
+  opacity: 0.8;
+}
+
+.play .levels {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.play .level {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 18px;
+  border: 1px solid #2c5373;
+  border-radius: 8px;
+  background: #11283b;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.play .level:hover,
+.play .level:focus-visible {
+  border-color: #ffcc4d;
+  background: #16334b;
+}
+
+.play .level b {
+  font-size: 1.15rem;
+}
+
+.play .level small,
+.play .empty,
+.play .help {
+  opacity: 0.7;
+}
+
+.play .need-song {
+  padding: 14px 18px;
+  border: 1px dashed #ffcc4d;
+  border-radius: 8px;
+}
+
+.play .need-song p {
+  margin: 0 0 8px;
+}
+
+.play .game {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.play .bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.play .bar b {
+  font-size: 1.2rem;
+  margin-right: auto;
+}
+
+.play .bar button {
+  padding: 6px 16px;
+  cursor: pointer;
+}
+
+.play .stage {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #123047;
+}
+
+.play .help {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.play [hidden] {
+  display: none;
+}

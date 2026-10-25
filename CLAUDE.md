@@ -171,6 +171,14 @@ src/
 
 Build step 1 done: `AudioClock`, level types, `LevelRunner` (update, seek) with Vitest tests, and a debug page (`src/debug/DebugPage.ts`) that main.ts mounts for now. Build step 2 in progress: `MiniGame` contract (`src/types/minigame.ts`), `repsFor`, keyboard input mapping, minigame templates and registry, `MINIGAMES.md`, and the minigame sandbox are done. A teammate is building the minigames themselves from `MINIGAMES.md`.
 
-Build step 4 mostly done: editor at `/editor.html` with waveform, scrub bar, clips (move, resize, snap), beat grid, per-clip beat maps (osu-style hits), save/load in IndexedDB, and a preview viewer that runs the real `LevelScene` (`src/engine/LevelScene.ts`: clips, buffers, lives, 321GO countdown with a 1 s breather before each minigame). `index.html` is a home menu linking to the editor, sandbox, and debug pages; Play is disabled until the level player has its own page.
+Build step 4 mostly done: editor at `/editor.html` with waveform, scrub bar, clips (move, resize, snap), beat grid, per-clip beat maps (osu-style hits), save/load in IndexedDB, and a preview viewer that runs the real `LevelScene` (`src/engine/LevelScene.ts`: clips, buffers, lives, 321GO countdown with a 1 s breather before each minigame). `index.html` is a home menu linking to the Play page, editor, sandbox, and debug pages.
 
-Next: Game Over screen (Restart Level / Main Menu) and a practice (infinite lives) toggle for previews, then a Play page with level select.
+Build step 3 done inside `LevelScene`: Game Over overlay (Restart Level / Main Menu, options supplied by the host page) and practice mode (misses counted instead of lives), toggled in the editor. Hit judging for beat maps is shared in `src/minigames/shared/judgePress.ts` (±0.16 s window, early presses fail). The font is Pixelify Sans, self-hosted in `public/fonts`; Phaser text must use `textStyle` from `src/minigames/shared/font.ts`.
+
+Play page done at `/play.html` (level select, real lives, Restart Level, Main Menu to home), sharing setup with the editor through `src/engine/gameView.ts`. **Known bug:** on the Play page, keyboard input, the page buttons, and the Game Over menu stop responding once a level is running (the game itself plays). Not yet diagnosed; next step is to get the browser console output from Connor. Suspect: the Phaser game is created while its section is still `hidden`.
+
+Build step 5 (media track) mostly done: `src/engine/MediaLayer.ts` draws video/images behind a transparent game canvas, synced to the song clock; the editor has a media lane under the waveform with add, drag, cut (`src/editor/mediaEditing.ts`), per-piece blur/dim, length, and an on/off switch saved as `mediaEnabled`. Media files are stored in IndexedDB (db version 2, `media` store).
+
+Minigames: Fire the Cannon is built (`src/minigames/fire_cannon/`). Connor also owns Swab the Deck and Dodge the Kraken; Cole owns Patch the Hull.
+
+Next: Swab the Deck, then Dodge the Kraken, then build real levels and come back to the Play page bug.

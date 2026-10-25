@@ -1,6 +1,8 @@
 import { cycleLength, repsFor } from '../engine/clipRules'
-import type { Clip } from '../types/level'
 import type { MiniGameMeta } from '../types/minigame'
+
+// Placement rules for anything on a timeline track: game and buffer clips, and media clips. They only need
+// start and end, so every track shares the same no-overlap rules.
 
 export const MIN_BUFFER = 0.25 // seconds: shortest buffer clip
 const EPS = 1e-6 // float slack so clips that exactly touch don't count as overlapping
@@ -30,7 +32,7 @@ export function fitLength(meta: MiniGameMeta | null, wanted: number, room: numbe
 }
 
 // Stretches of the song not covered by any clip, ignoring the clip at `skip` (pass -1 to ignore none).
-export function freeGaps(clips: Clip[], skip: number, songLength: number): Span[] {
+export function freeGaps(clips: readonly Span[], skip: number, songLength: number): Span[] {
   const others = clips.filter((_, i) => i !== skip).sort((a, b) => a.start - b.start)
   const gaps: Span[] = []
   let cursor = 0
@@ -44,7 +46,7 @@ export function freeGaps(clips: Clip[], skip: number, songLength: number): Span[
 
 // Where a clip of `length` lands when dropped at `start`: inside the free gap under its center, pushed in
 // so it fits. Null if its center is over another clip or the gap is too small. Use index -1 for a new clip.
-export function placeMove(clips: Clip[], index: number, start: number, length: number, songLength: number): Span | null {
+export function placeMove(clips: readonly Span[], index: number, start: number, length: number, songLength: number): Span | null {
   const center = start + length / 2
   const gap = freeGaps(clips, index, songLength).find(g => center >= g.start - EPS && center <= g.end + EPS)
   if (!gap || gap.end - gap.start < length - EPS) return null
@@ -55,7 +57,7 @@ export function placeMove(clips: Clip[], index: number, start: number, length: n
 // Drags one edge of clip `index` to `edgeTime`. The other edge stays put, the length snaps for the clip's
 // game, and the clip stops at its neighbours. Null if no legal length fits.
 export function placeResize(
-  clips: Clip[],
+  clips: readonly Span[],
   index: number,
   side: 'start' | 'end',
   edgeTime: number,
