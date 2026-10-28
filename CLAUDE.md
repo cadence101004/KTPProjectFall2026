@@ -179,6 +179,6 @@ Play page done at `/play.html` (level select, real lives, Restart Level, Main Me
 
 Build step 5 (media track) mostly done: `src/engine/MediaLayer.ts` draws video/images behind a transparent game canvas, synced to the song clock; the editor has a media lane under the waveform with add, drag, cut (`src/editor/mediaEditing.ts`), per-piece blur/dim, length, and an on/off switch saved as `mediaEnabled`. Media files are stored in IndexedDB (db version 2, `media` store).
 
-Minigames: Fire the Cannon is built (`src/minigames/fire_cannon/`). Connor also owns Swab the Deck and Dodge the Kraken; Cole owns Patch the Hull.
+Minigames built: Fire the Cannon (with Cadence's cannon and grass art), Swab the Deck, and Dodge the Kraken (pirate sprites, hop and Mario-style death animations), all owned by Connor; Patch the Hull by Cole. Sprites live in `public/assets/sprites/`.
 
-Next: Swab the Deck, then Dodge the Kraken, then build real levels and come back to the Play page bug.
+Next: build real levels with the four minigames, then come back to the Play page bug.
