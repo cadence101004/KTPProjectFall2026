@@ -1,6 +1,7 @@
 import '../style.css'
 import './play.css'
 import { AudioClock } from '../audio/AudioClock'
+import { installPirateCursor, setWaiting } from '../ui/cursor'
 import { hashFile } from '../audio/hash'
 import { createGameView, loadCountdownSound } from '../engine/gameView'
 import { listenForKeys } from '../engine/input'
@@ -101,8 +102,13 @@ async function pick(picked: Level): Promise<void> {
 
 // Decodes the song, loads the level's stored media, and shows the game view, ready to Start.
 async function openLevel(picked: Level, file: Blob): Promise<void> {
-  await clock.load(file)
-  media = await loadMediaFiles(picked.media)
+  setWaiting(true) // the hourglass cursor, until the song and its media are ready
+  try {
+    await clock.load(file)
+    media = await loadMediaFiles(picked.media)
+  } finally {
+    setWaiting(false)
+  }
   mediaLayer.setMedia(picked.media, mediaUrls(media), picked.mediaEnabled !== false)
   level = picked
   waitingForSong = null
@@ -171,3 +177,5 @@ window.addEventListener('keydown', event => {
 })
 
 void showLevelList()
+
+void installPirateCursor()

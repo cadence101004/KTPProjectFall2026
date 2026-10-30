@@ -20,7 +20,7 @@
 .editor button {
   padding: 6px 16px;
   font: inherit;
-  cursor: pointer;
+  cursor: var(--cursor-hover, pointer);
 }
 
 .editor .time {
@@ -81,7 +81,7 @@
   border: none;
   border-radius: 3px;
   background: #1a3348;
-  cursor: pointer;
+  cursor: var(--cursor-hover, pointer);
 }
 
 .editor .beat-map .cell.on-beat {
@@ -115,7 +115,7 @@
   border: 1px solid #1d3a52;
   border-radius: 6px 6px 0 0;
   margin-bottom: -12px; /* tuck against the waveform below */
-  cursor: ew-resize;
+  cursor: var(--cursor-hover, ew-resize);
   touch-action: none;
 }
 
@@ -177,7 +177,7 @@
   background: rgba(180, 110, 255, 0.45);
   border: 1px solid rgba(200, 150, 255, 0.8);
   border-radius: 4px;
-  cursor: grab;
+  cursor: var(--cursor-hover, grab);
   touch-action: none;
 }
 
@@ -207,9 +207,38 @@
   padding: 6px 16px;
   border: 1px solid #6fa8c9;
   border-radius: 4px;
-  cursor: pointer;
+  cursor: var(--cursor-hover, pointer);
 }
 
 .editor .file-button input {
   display: none;
+}
+
+/* Our own timeline scrollbar (the native one can't show the pirate cursor). */
+.editor .timeline-scrollbar {
+  position: relative;
+  height: 12px;
+  margin-top: -6px;
+  background: #0b1a2a;
+  border: 1px solid #1d3a52;
+  border-radius: 6px;
+  cursor: var(--cursor-hover, pointer);
+  touch-action: none;
+}
+
+.editor .timeline-thumb {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  min-width: 24px;
+  background: #2c5373;
+  border-radius: 5px;
+}
+
+.editor .timeline-scrollbar:hover .timeline-thumb {
+  background: #6fa8c9;
+}
+
+.editor .timeline-scrollbar.full .timeline-thumb {
+  opacity: 0.35; /* the whole song is in view, so there's nothing to scroll */
 }

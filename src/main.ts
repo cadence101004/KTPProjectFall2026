@@ -1,4 +1,5 @@
 import './style.css'
+import { installPirateCursor } from './ui/cursor'
 import './home.css'
 
 // Home menu. Each section is its own page.
@@ -23,3 +24,5 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
         .join('')}
     </nav>
   </main>`
+
+void installPirateCursor()

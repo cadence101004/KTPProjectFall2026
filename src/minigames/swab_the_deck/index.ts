@@ -1,6 +1,7 @@
 // Swab the Deck: grime spots appear at the start of each 4-beat cycle, and the player scrubs them clean by
-// holding the mouse button and rubbing back and forth over each one before the cycle ends. No beat map:
-// it's judged by cycle windows. Spec in MINIGAMES.md.
+// moving the mop (the mouse, no button needed) back and forth over each one. The game only fails if grime
+// is still left when the next wave arrives, or when the clip ends for the last wave. No beat map: it's
+// judged by cycle windows. Spec in MINIGAMES.md.
 import type Phaser from 'phaser'
 import type { GameInput, MiniGame, MiniGameParams, Status, TaskMeta } from '../../types/minigame'
 import { textStyle } from '../shared/font'
@@ -40,7 +41,8 @@ export class SwabTheDeckGame implements MiniGame {
   private sprungRep = -1 // the last cycle whose grime has appeared, so each cycle's grime appears once
   private spots: Spot[] = [] // a fixed pool of MAX_SPOTS slots; only grime.count are used
   private mopAt: Point = { x: 0.5, y: 0.5 }
-  private lastStroke: Point | null = null // where the mop was on the previous move, while the button is held
+  private lastAt: Point | null = null // where the mop was on the previous pointer event
+  private scrubbedAt = -Infinity // song time the mop last scrubbed some grime, to show it working
   private objects: Phaser.GameObjects.GameObject[] = [] // everything added to the scene, for destroy()
   private mop!: Phaser.GameObjects.Arc
   private label!: Phaser.GameObjects.Text
@@ -96,7 +98,7 @@ export class SwabTheDeckGame implements MiniGame {
       spot.circle.setAlpha(0.25 + 0.75 * (spot.dirt / this.grime.dirt))
     })
     this.mop.setPosition(this.mopAt.x * width, this.mopAt.y * height)
-    this.mop.setFillStyle(MOP_COLOR, this.lastStroke ? 0.35 : 0) // filled while scrubbing
+    this.mop.setFillStyle(MOP_COLOR, songTime - this.scrubbedAt < 0.1 ? 0.35 : 0) // fills in while it's scrubbing
 
     const left = this.spotsLeft()
     if (this.result === 'won') this.label.setText('SPOTLESS!')
@@ -105,18 +107,15 @@ export class SwabTheDeckGame implements MiniGame {
     else this.label.setText(`Deck ${this.rep + 1} / ${this.params.reps}   ${left} spot${left === 1 ? '' : 's'} left`)
   }
 
-  // Hold the button and move to scrub. Each stroke between pointer moves scrubs every spot it passes over.
+  // Just move the mouse to scrub; no button needed. Each stroke between pointer events scrubs every spot
+  // it passes over.
   handleInput(input: GameInput): void {
     if (input.kind !== 'pointer') return
     const at = { x: input.x, y: input.y }
+    const from = this.lastAt
     this.mopAt = at
-    if (input.phase === 'down') this.lastStroke = at
-    if (input.phase === 'up') this.lastStroke = null
-    if (input.phase !== 'move' || !this.lastStroke) return
-
-    const from = this.lastStroke
-    this.lastStroke = at
-    if (this.result !== 'running' || this.repDone) return
+    this.lastAt = at
+    if (!from || this.result !== 'running' || this.repDone) return
 
     // Judge the stroke by its own song time: one after this cycle's window closed is too late, even if
     // update() hasn't closed it yet. Strokes before this cycle's grime appeared scrub nothing.
@@ -127,7 +126,9 @@ export class SwabTheDeckGame implements MiniGame {
     for (const spot of this.spots.slice(0, this.grime.count)) {
       // The mop ring scrubs anything it touches: the spot's radius plus the ring's own radius.
       const reach = this.grime.radius * (1 + MOP_REACH)
-      if (spot.dirt > 0) spot.dirt = Math.max(0, spot.dirt - rubAmount(spot.at, from, at, width / height, reach))
+      const rubbed = spot.dirt > 0 ? rubAmount(spot.at, from, at, width / height, reach) : 0
+      if (rubbed > 0) this.scrubbedAt = input.songTime
+      spot.dirt = Math.max(0, spot.dirt - rubbed)
     }
     if (this.spotsLeft() > 0) return
     this.repDone = true
@@ -147,7 +148,9 @@ export class SwabTheDeckGame implements MiniGame {
     return this.spots.slice(0, this.grime.count).filter(spot => spot.dirt > 0).length
   }
 
-  // Each deck gets an equal slice of the clip. When a slice closes, its deck must be clean or the game fails.
+  // Each deck gets an equal slice of the clip, and the next wave of grime arrives when a slice closes. This
+  // is the only place the game can fail: grime still left when the next wave arrives, or when the clip ends
+  // for the last wave (the engine's final update(clip.end) closes that slice).
   private checkRepWindow(songTime: number): void {
     const repLength = this.params.duration / this.params.reps
     const current = Math.floor((songTime - this.params.startTime) / repLength + 1e-6)

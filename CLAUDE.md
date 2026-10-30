@@ -181,4 +181,6 @@ Build step 5 (media track) mostly done: `src/engine/MediaLayer.ts` draws video/i
 
 Minigames built: Fire the Cannon (with Cadence's cannon and grass art), Swab the Deck, and Dodge the Kraken (pirate sprites, hop and Mario-style death animations), all owned by Connor; Patch the Hull by Cole. Sprites live in `public/assets/sprites/`.
 
+Site-wide pirate hook cursors (Cadence's art) live in `src/ui/cursor.ts`: images are shrunk on a canvas at load and handed to CSS variables (`--cursor-default`, `-hover`, `-press`, `-drag`, `-wait`) used by `style.css`. Shadow DOM areas (wavesurfer) need their own stylesheet (see `Timeline.useHookCursors`), and the timeline uses a custom scrollbar because native scrollbars always show the system cursor.
+
 Next: build real levels with the four minigames, then come back to the Play page bug.

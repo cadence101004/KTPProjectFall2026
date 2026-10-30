@@ -1,4 +1,5 @@
 import '../style.css'
+import { installPirateCursor } from '../ui/cursor'
 import './sandbox.css'
 import { createGameView } from '../engine/gameView'
 import { listenForKeys } from '../engine/input'
@@ -42,3 +43,5 @@ $('start').addEventListener('click', () => {
     beatSync: $<HTMLInputElement>('beatSync').checked,
   })
 })
+
+void installPirateCursor()

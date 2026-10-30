@@ -1,6 +1,7 @@
 import '../style.css'
 import './editor.css'
 import { AudioClock } from '../audio/AudioClock'
+import { installPirateCursor, setWaiting } from '../ui/cursor'
 import { hashFile } from '../audio/hash'
 import { defaultHits, hitTimes, repsFor, usesBeatMap } from '../engine/clipRules'
 import { createGameView, loadCountdownSound } from '../engine/gameView'
@@ -323,10 +324,17 @@ async function addMedia(file: File): Promise<void> {
     return
   }
   const kind = file.type.startsWith('image/') ? 'image' : 'video'
-  const hash = await hashFile(file)
-  const url = mediaFiles.get(hash)?.url ?? URL.createObjectURL(file)
-  mediaFiles.set(hash, { name: file.name, file, url })
-  const wanted = kind === 'video' ? await videoLength(url) : 8
+  setWaiting(true) // hashing and measuring a big video takes a moment
+  let hash: string
+  let wanted: number
+  try {
+    hash = await hashFile(file)
+    const url = mediaFiles.get(hash)?.url ?? URL.createObjectURL(file)
+    mediaFiles.set(hash, { name: file.name, file, url })
+    wanted = kind === 'video' ? await videoLength(url) : 8
+  } finally {
+    setWaiting(false)
+  }
   const at = snapToGrid(playhead, grid())
   const gap = freeGaps(level.media, -1, songLength).find(g => at >= g.start - 1e-6 && at < g.end)
   if (!gap) {
@@ -552,16 +560,21 @@ function deleteSelected(): void {
 async function openSong(file: Blob, name: string): Promise<void> {
   if (playing) pause()
   setStatus(`Loading ${name}...`)
-  await clock.load(file)
+  setWaiting(true) // the hourglass cursor, until the song and its media are ready
+  try {
+    await clock.load(file)
+    for (const [hash, media] of await loadMediaFiles(level.media.filter(clip => !mediaFiles.has(clip.mediaHash)))) {
+      mediaFiles.set(hash, media)
+    }
+  } finally {
+    setWaiting(false)
+  }
   const buffer = clock.getBuffer()!
   song = { file, name }
   songLength = buffer.duration
   playhead = 0
   selected = -1
   selectedMedia = -1
-  for (const [hash, media] of await loadMediaFiles(level.media.filter(clip => !mediaFiles.has(clip.mediaHash)))) {
-    mediaFiles.set(hash, media)
-  }
   await timeline.show(computePeaks(buffer.getChannelData(0), buffer.sampleRate), songLength)
   $('length').textContent = songLength.toFixed(2)
   playButton.disabled = false
@@ -752,3 +765,5 @@ window.addEventListener('keydown', event => {
 
 void refreshLevelList()
 requestAnimationFrame(frame)
+
+void installPirateCursor()

@@ -46,7 +46,7 @@
   background: #11283b;
   color: inherit;
   text-align: left;
-  cursor: pointer;
+  cursor: var(--cursor-hover, pointer);
 }
 
 .play .level:hover,
@@ -95,7 +95,7 @@
 
 .play .bar button {
   padding: 6px 16px;
-  cursor: pointer;
+  cursor: var(--cursor-hover, pointer);
 }
 
 .play .stage {

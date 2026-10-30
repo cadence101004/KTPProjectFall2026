@@ -31,6 +31,7 @@ export class Timeline {
   private readonly knob: HTMLDivElement
   private readonly mediaTrack: HTMLDivElement // the media lane under the waveform; scrolls and zooms with it
   private readonly mediaPlayhead: HTMLDivElement
+  private readonly scrollThumb: HTMLDivElement // our own scrollbar's thumb (see onScrollbar)
   private duration = 0
 
   constructor(container: HTMLElement) {
@@ -43,6 +44,15 @@ export class Timeline {
     this.mediaPlayhead.className = 'media-playhead'
     lane.append(this.mediaTrack)
     container.after(lane)
+
+    // Our own horizontal scrollbar under the media lane. Browsers always show the plain system arrow over
+    // a native scrollbar, so wavesurfer's is hidden and this one (which shows the hook cursor) drives it.
+    const scrollbar = document.createElement('div')
+    scrollbar.className = 'timeline-scrollbar'
+    this.scrollThumb = document.createElement('div')
+    this.scrollThumb.className = 'timeline-thumb'
+    scrollbar.append(this.scrollThumb)
+    lane.after(scrollbar)
 
     // Scrub bar above the waveform. Normal page DOM (outside wavesurfer), so editor.css styles it.
     const ruler = document.createElement('div')
@@ -64,8 +74,11 @@ export class Timeline {
       normalize: true,
       minPxPerSec: 50,
       autoScroll: false,
+      hideScrollbar: true, // replaced by our own scrollbar, above
     })
     this.regions = this.waves.registerPlugin(RegionsPlugin.create())
+    this.useHookCursors()
+    this.onScrollbar(scrollbar)
     // Styled inline: wavesurfer renders inside a shadow DOM, so page CSS never reaches this element.
     this.playhead = document.createElement('div')
     Object.assign(this.playhead.style, {
@@ -79,6 +92,55 @@ export class Timeline {
     })
     this.grid = document.createElement('div')
     Object.assign(this.grid.style, { position: 'absolute', inset: '0', pointerEvents: 'none', zIndex: '1' })
+  }
+
+  // wavesurfer and its Regions plugin draw inside a shadow DOM and set their own system cursors on clips
+  // (grab, default, col-resize), which hid the pirate hook there. This puts a small stylesheet inside that
+  // shadow DOM. The cursor variables come from src/ui/cursor.ts and are inherited into it; !important beats
+  // the plugin's inline cursors; :host-context follows the page's pressing and dragging states.
+  private useHookCursors(): void {
+    const root = this.waves.getWrapper().getRootNode()
+    if (!(root instanceof ShadowRoot)) return
+    const style = document.createElement('style')
+    style.textContent = `
+      * { cursor: var(--cursor-default, auto) !important; }
+      [part~='region'], [part~='region'] * { cursor: var(--cursor-hover, grab) !important; }
+      :host-context(html.pressing) * { cursor: var(--cursor-press, pointer) !important; }
+      :host-context(html.dragging) * { cursor: var(--cursor-drag, grabbing) !important; }
+    `
+    root.append(style)
+  }
+
+  // Dragging the scrollbar's thumb scrolls the timeline; clicking the track jumps the view there.
+  private onScrollbar(scrollbar: HTMLElement): void {
+    let grabOffset: number | null = null // where on the thumb it was grabbed, in pixels
+    const scrollTo = (clientX: number) => {
+      const bar = scrollbar.getBoundingClientRect()
+      const total = this.waves.getWrapper().offsetWidth
+      this.waves.setScroll(((clientX - bar.left - (grabOffset ?? 0)) / bar.width) * total)
+    }
+    scrollbar.addEventListener('pointerdown', event => {
+      if (this.duration === 0) return
+      const thumb = this.scrollThumb.getBoundingClientRect()
+      const onThumb = event.clientX >= thumb.left && event.clientX <= thumb.right
+      grabOffset = onThumb ? event.clientX - thumb.left : thumb.width / 2 // clicking the track centers the view
+      scrollbar.setPointerCapture(event.pointerId)
+      scrollTo(event.clientX)
+    })
+    scrollbar.addEventListener('pointermove', event => {
+      if (grabOffset !== null) scrollTo(event.clientX)
+    })
+    scrollbar.addEventListener('pointerup', () => (grabOffset = null))
+  }
+
+  // Sizes and places the scrollbar thumb to match the part of the song in view.
+  private syncScrollbar(): void {
+    const total = this.waves.getWrapper().offsetWidth
+    if (total <= 0) return
+    const visible = Math.min(1, this.waves.getWidth() / total)
+    this.scrollThumb.style.width = `${visible * 100}%`
+    this.scrollThumb.style.left = `${(this.waves.getScroll() / total) * 100}%`
+    this.scrollThumb.parentElement!.classList.toggle('full', visible >= 0.999) // nothing to scroll
   }
 
   // Draws a song from precomputed peaks (see computePeaks). No second decode of the MP3.
@@ -121,6 +183,7 @@ export class Timeline {
       track.style.width = `${this.waves.getWrapper().offsetWidth}px`
       track.style.transform = `translateX(${-this.waves.getScroll()}px)`
     }
+    this.syncScrollbar()
   }
 
   // Redraws the media lane's blocks. Each block's index matches its media clip.

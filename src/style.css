@@ -67,7 +67,7 @@ canvas {
 .debug button {
   padding: 8px 14px;
   font: inherit;
-  cursor: pointer;
+  cursor: var(--cursor-hover, pointer);
 }
 
 .debug .readout {
@@ -116,4 +116,74 @@ canvas {
 
 div.media-layer {
   background: #000; /* the dim half of the frosted cover; its opacity is the clip's dim */
+}
+
+/* Pirate hook cursors. src/ui/cursor.ts fills in these variables when the page loads; until then (or if an
+   image fails) the system cursor after the comma is used. */
+html {
+  cursor: var(--cursor-default, auto);
+}
+
+a,
+button,
+label,
+select,
+summary,
+input[type='checkbox'],
+input[type='range'],
+input[type='file'] {
+  cursor: var(--cursor-hover, pointer);
+}
+
+input[type='text'],
+input[type='number'],
+textarea {
+  cursor: text;
+}
+
+button:disabled {
+  cursor: var(--cursor-default, default);
+}
+
+/* Phaser sets its own cursor on the canvas when hovering game buttons; keep the hook instead. */
+.stage canvas {
+  cursor: var(--cursor-default, auto) !important;
+}
+
+html.pressing,
+html.pressing * {
+  cursor: var(--cursor-press, pointer) !important;
+}
+
+html.dragging,
+html.dragging * {
+  cursor: var(--cursor-drag, grabbing) !important;
+}
+
+html.waiting,
+html.waiting * {
+  cursor: var(--cursor-wait, wait) !important;
+}
+
+/* Sparkles where the mouse is pressed. */
+.click-sparkle {
+  position: fixed;
+  width: 36px;
+  height: 36px;
+  margin: -18px 0 0 -18px;
+  pointer-events: none;
+  image-rendering: pixelated;
+  z-index: 9999;
+  animation: click-sparkle 0.45s ease-out forwards;
+}
+
+@keyframes click-sparkle {
+  from {
+    opacity: 1;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.3) rotate(20deg);
+  }
 }
