@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { gradeFor, judgePress, tooManyMisses } from './judgePress'
+import { gradeFor, judgePress, tooManyMisses, windowScaleFor } from './judgePress'
+
+describe('windowScaleFor', () => {
+  it('narrows the judgement windows as difficulty rises', () => {
+    expect(windowScaleFor(1)).toBe(1)
+    expect(windowScaleFor(2)).toBe(0.8)
+    expect(windowScaleFor(3)).toBe(0.65)
+    expect(windowScaleFor(5)).toBe(0.65)
+  })
+})
 
 describe('tooManyMisses', () => {
   it('fails at a quarter or more of the hits missed', () => {

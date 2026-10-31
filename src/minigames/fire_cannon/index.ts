@@ -3,10 +3,10 @@
 import type Phaser from 'phaser'
 import type { GameInput, MiniGame, MiniGameParams, Status, TaskMeta } from '../../types/minigame'
 import { textStyle } from '../shared/font'
-import { type Grade, HIT_WINDOW, judgePress, tooManyMisses } from '../shared/judgePress'
+import { type Grade, HIT_WINDOW, judgePress, tooManyMisses, windowScaleFor } from '../shared/judgePress'
 import { showJudgement } from '../shared/judgeText'
 import { u } from '../shared/units'
-import { fuseBurn, windowScaleFor } from './fuse'
+import { fuseBurn } from './fuse'
 
 // Texture keys, prefixed with the game ID so they never clash with another game's.
 const CANNON = 'fire_cannon_cannon'

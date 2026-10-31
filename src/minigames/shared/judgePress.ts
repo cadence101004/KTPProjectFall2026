@@ -23,6 +23,12 @@ export interface Judgement {
   offset: number // press time minus hit time, in seconds: negative is early, positive is late
 }
 
+// How much every judgement window shrinks as difficulty rises: full size at 1, then 80% and 65%. Pass it to
+// judgePress (and gradeFor) as the scale, so every rhythm game gets harder the same way.
+export function windowScaleFor(difficulty: number): number {
+  return difficulty >= 3 ? 0.65 : difficulty >= 2 ? 0.8 : 1
+}
+
 // The grade for a press `offset` seconds from its hit, or null if it's outside every window.
 // `scale` shrinks every window together (difficulty uses it): 1 is the full size.
 export function gradeFor(offset: number, scale = 1): Grade | null {

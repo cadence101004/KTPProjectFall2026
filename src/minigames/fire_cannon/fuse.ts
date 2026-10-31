@@ -1,10 +1,5 @@
 // Pure fuse logic for Fire the Cannon. No Phaser in here, so it can be tested with plain Vitest.
-
-// How much every judgement window (perfect, great, good) shrinks as difficulty rises: full size at 1,
-// then 80% and 65%. Pass it to judgePress as its scale.
-export function windowScaleFor(difficulty: number): number {
-  return difficulty >= 3 ? 0.65 : difficulty >= 2 ? 0.8 : 1
-}
+// (Difficulty's narrower hit windows come from windowScaleFor in ../shared/judgePress.ts.)
 
 // How long a fuse burns before its shot, in beats. Hits closer together than this get shorter fuses.
 export const FUSE_BEATS = 2

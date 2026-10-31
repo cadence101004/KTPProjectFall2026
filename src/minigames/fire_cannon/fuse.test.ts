@@ -1,14 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fuseBurn, windowScaleFor } from './fuse'
-
-describe('windowScaleFor', () => {
-  it('narrows the judgement windows as difficulty rises', () => {
-    expect(windowScaleFor(1)).toBe(1)
-    expect(windowScaleFor(2)).toBe(0.8)
-    expect(windowScaleFor(3)).toBe(0.65)
-    expect(windowScaleFor(5)).toBe(0.65)
-  })
-})
+import { fuseBurn } from './fuse'
 
 // 120 BPM: a beat is 0.5 s, so a full 2-beat fuse burns for 1 s. The clip starts at 10 s.
 const beat = 0.5
