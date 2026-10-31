@@ -27,6 +27,7 @@ import { type ClipView, Timeline } from './Timeline'
 const app = document.querySelector<HTMLDivElement>('#app')!
 app.innerHTML = `
   <div class="editor">
+    <a href="/" class="home-link">&larr; Home</a>
     <h1>Timeline editor</h1>
     <div class="controls">
       <label>Level <input id="title" type="text" value="Untitled level" /></label>

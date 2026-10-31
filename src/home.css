@@ -1,53 +1,195 @@
+
+/* SHIP HAPPENS — MAIN MENU */
+
 .home {
-  width: min(480px, calc(100% - 32px));
-  text-align: center;
+  width: 100%;
+  min-height: 100vh;
+  box-sizing: border-box;
+
+  background-image: url('/assets/sprites/menu/MainMenuBackground.png');
+  background-color: #b774b6;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
 }
 
-.home h1 {
-  margin: 0;
-  font-size: clamp(2.5rem, 8vw, 4rem);
-  color: #ffcc4d;
-  letter-spacing: 0.04em;
+.home-content {
+  width: min(100%, 550px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
 }
+
+/* Title PNG */
+
+.home-logo {
+  width: min(100%, 425px);
+  height: auto;
+  display: block;
+  image-rendering: pixelated;
+
+  filter: drop-shadow(0 5px 2px #5a346055);
+}
+
+/* Subtitle */
 
 .home .tagline {
-  margin: 4px 0 28px;
-  opacity: 0.75;
+  margin: 0 0 10px;
+  font-size: 19px;
+  font-weight: 600;
+  color: #633b75;
+  text-align: center;
+  text-shadow: 1px 1px 0 #ffe3f1;
 }
+
+/* Button container */
 
 .home .menu {
+  width: min(100%, 400px);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 9px;
 }
+
+/* Individual buttons */
 
 .home .item {
+  width: 100%;
+  height: 72px;
+  box-sizing: border-box;
+
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 14px 18px;
-  border: 1px solid #2c5373;
-  border-radius: 8px;
-  background: #11283b;
-  color: inherit;
+  align-items: center;
+  justify-content: center;
+
+  background-image:
+    url('/assets/sprites/menu/CreamButtonBackground.png');
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+
+  border: none;
   text-decoration: none;
-  text-align: left;
+  color: #693b69;
+
+  font-family: 'Pixelify Sans', monospace;
+  font-size: 25px;
+  font-weight: 700;
+
+  image-rendering: pixelated;
+  transition: transform 0.15s, filter 0.15s;
 }
 
-.home a.item:hover,
-.home a.item:focus-visible {
-  border-color: #ffcc4d;
-  background: #16334b;
+/* Alternate pink buttons */
+
+.home .item:nth-child(3),
+.home .item:nth-child(5) {
+  background-image:
+    url('/assets/sprites/menu/PinkButtonBackground.png');
+  color: #fff5e9;
 }
 
-.home .item b {
-  font-size: 1.15rem;
+/* Play PNG already contains its label */
+
+.home .item.play-item {
+  height: 85px;
+  background: none;
+  padding: 0;
 }
 
-.home .item small {
-  opacity: 0.7;
+.home .play-art {
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  image-rendering: pixelated;
 }
 
-.home .item.disabled {
-  opacity: 0.45;
+/* Button text */
+
+.home .button-label {
+  text-align: center;
+  padding: 0 20px;
+  text-shadow: 1px 1px 0 #fff1e880;
+}
+
+/* Hover */
+
+.home .item:hover {
+  transform: scale(1.045);
+  filter: brightness(1.08);
+}
+
+.home .item:active {
+  transform: scale(0.98);
+}
+
+.home .item:focus-visible {
+  outline: 3px solid #fff6e9;
+  outline-offset: 3px;
+}
+
+/* Decorative sprites */
+
+.menu-decorations {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 10px;
+}
+
+.menu-decorations img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+/* Responsive */
+
+@media (max-width: 600px) {
+  .home {
+    padding: 20px 12px;
+  }
+
+  .home-logo {
+    width: min(100%, 320px);
+  }
+
+  .home .item {
+    height: 62px;
+    font-size: 19px;
+  }
+
+  .home .item.play-item {
+    height: 74px;
+  }
+
+  .home .tagline {
+    font-size: 15px;
+  }
+}
+
+/* Remove global page spacing on home screen */
+html:has(.home),
+body:has(.home) {
+  margin: 0;
+  min-height: 100%;
+}
+
+body:has(.home) #app {
+  display: block;
+  width: 100%;
+  min-height: 100vh;
+  padding: 0;
+}
+
+body:has(.home) #app > .home {
+  margin: 0;
 }

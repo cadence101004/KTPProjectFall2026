@@ -7,6 +7,7 @@ import type { Clip } from '../types/level'
 export function mountDebugPage(root: HTMLElement): void {
   root.innerHTML = `
     <div class="debug">
+      <a href="/" class="home-link">&larr; Home</a>
       <h1>PirateWare debug</h1>
       <input type="file" id="song" accept="audio/*,video/mp4" />
       <p id="status">Pick a song to load.</p>

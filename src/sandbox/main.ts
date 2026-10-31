@@ -11,6 +11,7 @@ import { SandboxScene } from './SandboxScene'
 const app = document.querySelector<HTMLDivElement>('#app')!
 app.innerHTML = `
   <div class="sandbox">
+    <a href="/" class="home-link">&larr; Home</a>
     <h1>Minigame sandbox</h1>
     <div class="controls">
       <label>Game <select id="game">${Object.keys(allGames).map(id => `<option>${id}</option>`).join('')}</select></label>
