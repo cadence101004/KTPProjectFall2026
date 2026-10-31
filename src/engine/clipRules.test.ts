@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { GameClip } from '../types/level'
 import type { DurationMeta, TaskMeta } from '../types/minigame'
-import { defaultHits, hitTimes, repsFor, usesBeatMap } from './clipRules'
+import { defaultHits, hitTimes, optionsFor, repsFor, usesBeatMap } from './clipRules'
 
 // At 120 BPM a beat is 0.5 s, so a 2-beat task cycle is 1 s.
 const task: TaskMeta = { id: 'fire_cannon', kind: 'task', prompt: 'FIRE!', hint: 'SPACE', baseBeats: 2 }
@@ -77,5 +77,24 @@ describe('beat maps', () => {
 
   it('gives games without default hits no beat map', () => {
     expect(hitTimes(task, clip(), 120)).toBeNull()
+  })
+})
+
+describe('optionsFor', () => {
+  const meta: DurationMeta = {
+    id: 'hop', kind: 'duration', prompt: 'HOP!', hint: '', minDuration: 4, canBeatSync: false,
+    options: [{ id: 'moving', label: 'Moving', default: true }, { id: 'night', label: 'Night', default: false }],
+  }
+
+  it('uses the defaults for a clip that sets nothing', () => {
+    expect(optionsFor(meta, {})).toEqual({ moving: true, night: false })
+  })
+
+  it("uses the clip's choices, and ignores options the game doesn't have", () => {
+    expect(optionsFor(meta, { options: { moving: false, stale: true } })).toEqual({ moving: false, night: false })
+  })
+
+  it('is empty for a game without options', () => {
+    expect(optionsFor({ ...meta, options: undefined }, { options: { moving: false } })).toEqual({})
   })
 })

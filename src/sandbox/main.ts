@@ -19,6 +19,7 @@ app.innerHTML = `
       <label>Difficulty <input id="difficulty" type="number" min="1" max="5" value="1" /></label>
       <label><input id="beatSync" type="checkbox" /> Beat sync</label>
       <label title="Untick to see the game's foreground alone, as over a level video"><input id="background" type="checkbox" checked /> Background</label>
+      <span id="options"></span>
       <button id="start">Start</button>
     </div>
     <div id="stage" class="stage"></div>
@@ -33,6 +34,22 @@ void createGameView('stage', scene)
 
 listenForKeys(clock, input => scene.send(input))
 
+// One checkbox per option the picked game offers (its meta.options), set to the option's default.
+function showOptions(): void {
+  const options = allGames[$<HTMLSelectElement>('game').value]().meta.options ?? []
+  $('options').replaceChildren(
+    ...options.map(option => {
+      const label = document.createElement('label')
+      const box = Object.assign(document.createElement('input'), { type: 'checkbox', checked: option.default })
+      box.dataset.option = option.id
+      label.append(box, ' ' + option.label)
+      return label
+    }),
+  )
+}
+$('game').addEventListener('change', showOptions)
+showOptions()
+
 $('start').addEventListener('click', () => {
   // Drop focus so Space and the arrows reach the game instead of the form controls.
   ;(document.activeElement as HTMLElement | null)?.blur()
@@ -43,6 +60,7 @@ $('start').addEventListener('click', () => {
     difficulty: Number($<HTMLInputElement>('difficulty').value) || 1,
     beatSync: $<HTMLInputElement>('beatSync').checked,
     background: $<HTMLInputElement>('background').checked,
+    options: Object.fromEntries([...$('options').querySelectorAll<HTMLInputElement>('input')].map(box => [box.dataset.option!, box.checked])),
   })
 })
 

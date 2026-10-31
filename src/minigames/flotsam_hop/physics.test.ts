@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { barrelX, type Body, GRAVITY, JUMP_SPEED, type Platform, raftAt, sinkState, sinkTimes, step } from './physics'
+import { ballHits, ballX, type Body, GRAVITY, JUMP_SPEED, type Platform, raftAt, sinkState, sinkTimes, step } from './physics'
 
 const beat = 0.5 // 120 BPM
 const flat = (x: number, y: number, width = 0.2, solid = true): Platform => ({ x, y, width, solid })
@@ -18,10 +18,32 @@ describe('raftAt', () => {
   })
 })
 
-describe('barrelX', () => {
-  it('drifts in from the right edge', () => {
-    expect(barrelX(10, 10)).toBeCloseTo(1.1)
-    expect(barrelX(10, 15)).toBeCloseTo(0.5)
+describe('ballX', () => {
+  it('flies in from the right edge', () => {
+    expect(ballX(10, 10)).toBeCloseTo(1.1)
+    expect(ballX(10, 11.2)).toBeCloseTo(0.5)
+  })
+
+  it('flies in from the left edge too', () => {
+    expect(ballX(10, 10, true)).toBeCloseTo(-0.1)
+    expect(ballX(10, 11.2, true)).toBeCloseTo(0.5)
+  })
+})
+
+describe('ballHits', () => {
+  const aspect = 16 / 9
+  const onRaft = standing(0.5, 0.68, 0)
+
+  it('hits her standing in its path', () => {
+    expect(ballHits(onRaft, 0.5, 0.64, aspect)).toBe(true)
+  })
+
+  it('misses once she has jumped over it', () => {
+    expect(ballHits({ x: 0.5, y: 0.55, vy: 0, on: -1 }, 0.5, 0.64, aspect)).toBe(false)
+  })
+
+  it('misses while it is still off to the side', () => {
+    expect(ballHits(onRaft, 0.6, 0.64, aspect)).toBe(false)
   })
 })
 

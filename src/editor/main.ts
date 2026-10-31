@@ -464,6 +464,24 @@ function renderClipOptions(clip: Clip | undefined): void {
     panel.append(background)
   }
 
+  // The game's own switches (meta.options), e.g. "Moving platforms". A clip stores only the ones set
+  // differently from their default, so a game can change a default later without rewriting old levels.
+  for (const option of meta.options ?? []) {
+    const label = document.createElement('label')
+    const box = Object.assign(document.createElement('input'), { type: 'checkbox', checked: clip.options?.[option.id] ?? option.default })
+    box.addEventListener('change', () => {
+      endPreview()
+      const options = { ...clip.options }
+      if (box.checked === option.default) delete options[option.id]
+      else options[option.id] = box.checked
+      if (Object.keys(options).length) clip.options = options
+      else delete clip.options
+      render()
+    })
+    label.append(box, ' ' + option.label)
+    panel.append(label)
+  }
+
   if (meta.kind === 'duration' && meta.canBeatSync) {
     const toggle = document.createElement('label')
     const box = Object.assign(document.createElement('input'), { type: 'checkbox', checked: !!clip.beatSync })

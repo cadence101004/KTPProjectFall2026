@@ -4,7 +4,7 @@ import { textStyle } from '../minigames/shared/font'
 import { u } from '../minigames/shared/units'
 import type { Clip, GameClip, Level } from '../types/level'
 import type { GameInput, HitGrade, MiniGame } from '../types/minigame'
-import { hitTimes, repsFor } from './clipRules'
+import { hitTimes, optionsFor, repsFor } from './clipRules'
 import { COUNT_LABELS, type CountdownCue, goLead, planCountdown } from './countdown'
 import { LevelRunner, type RunnerEvent, type TimeSource } from './LevelRunner'
 import { accuracyOf, addGrade, newSheet, type Rank, rankOf, type ScoreSheet, scoreClip, scoreOf } from './scoring'
@@ -203,6 +203,7 @@ export class LevelScene extends Phaser.Scene {
       hits,
       difficulty: clip.difficulty,
       background: !(clip.hideBackground && meta.canHideBackground), // only games that allow it can hide it
+      options: optionsFor(meta, clip),
       report: (grade: HitGrade) => {
         if (this.current !== current) return // a stray report after the clip ended
         current.reported++

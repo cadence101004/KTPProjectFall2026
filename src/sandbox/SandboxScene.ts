@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { hitTimes, repsFor } from '../engine/clipRules'
+import { hitTimes, optionsFor, repsFor } from '../engine/clipRules'
 import { allGames } from '../minigames/allGames'
 import { textStyle } from '../minigames/shared/font'
 import { u } from '../minigames/shared/units'
@@ -16,6 +16,7 @@ export interface SandboxRun {
   difficulty: number
   beatSync: boolean
   background: boolean // draw the minigame's background layer
+  options: Record<string, boolean> // the game's per-clip options (meta.options), as the checkboxes are set
 }
 
 // Plays one minigame as if it were a clip in a level: a one-bar count-in, the clip, then the result.
@@ -69,6 +70,7 @@ export class SandboxScene extends Phaser.Scene {
       end: startTime + duration,
       difficulty: run.difficulty,
       beatSync: run.beatSync,
+      options: run.options,
     }
 
     await this.clock.start(run.bpm)
@@ -83,6 +85,7 @@ export class SandboxScene extends Phaser.Scene {
       report: () => {}, // the sandbox plays one game on its own, with no level score to count toward
       difficulty: run.difficulty,
       background: run.background || !meta.canHideBackground, // games that don't allow hiding always draw it
+      options: optionsFor(meta, clip),
     }
     this.endTime = startTime + duration
     this.started = false

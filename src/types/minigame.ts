@@ -24,6 +24,15 @@ interface BaseMeta {
   // which turns on the editor's "Minigame background" checkbox. Leave it out for games whose background is
   // the playfield itself (a deck, a hull wall); those always draw it.
   canHideBackground?: boolean
+  // On/off switches a level designer can set per clip (e.g. "Moving platforms"), each shown as a checkbox
+  // in the editor and sandbox. The game reads the chosen values from MiniGameParams.options.
+  options?: GameOption[]
+}
+
+export interface GameOption {
+  id: string // key in GameClip.options and MiniGameParams.options, e.g. 'movingPlatforms'
+  label: string // checkbox text, e.g. 'Moving platforms'
+  default: boolean
 }
 
 // Task games: one task per cycle of baseBeats, always on the song's beat.
@@ -63,6 +72,8 @@ export interface MiniGameParams {
   // when the level designer turned it off for this clip so the level's media track shows through. Always
   // draw the foreground (floors, characters, props), and draw the background first so it stays behind.
   background: boolean
+  // The value of every option in meta.options for this clip (the clip's choice, or the option's default).
+  options: Record<string, boolean>
   // Call once for each hit the player makes or misses, so it counts toward the level's score and rank.
   // Games without discrete hits don't need it: the engine scores their clip by whether it was won.
   report: (grade: HitGrade) => void

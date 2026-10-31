@@ -93,10 +93,11 @@ Priority 1 games cover every case the engine has to handle, so build those first
 ### Flotsam Hop (`flotsam_hop`)
 - **Prompt / hint:** `HOP!` / `← →  ↑ JUMP`
 - **minDuration:** 4 s. **Beat sync:** optional. **Default hits:** `[0]` (a raft sinks on beat 1 of each bar)
-- **Mechanic:** Side-view platformer over the sea, with real gravity. Hold left or right to run, up (or action) to jump. Three rafts bob on the beat (the middle one also slides) and barrels drift past higher up as a second route. Standing on a moving raft carries you with it.
+- **Mechanic:** Side-view platformer over the sea, with real gravity. Hold left or right to run, up (or action) to jump. Three rafts bob on the beat (the middle one also slides) and every 2 beats a cannonball flies in fast from the left or right at knee height, so several cross at once: jump over them (the jump is floaty, about 1.15 s in the air). Standing on a moving raft carries you with it.
+- **Option:** `Moving platforms` (on by default). Untick it in the editor or sandbox to hold the rafts still.
 - **Beat sync on:** on each beat map hit, the raft you're standing on shakes red for a beat, then sinks for a beat and a half. **Off:** sinks come at their own pace.
-- **Fail:** falling in the sea three times (each fall is a Miss and respawns you on a safe raft, blinking). **Win:** reaching the clip end.
-- **Art:** Cadence's side-view pirate (`pirateside1/2` as a run cycle) and sideways jump frames. A sky over the sea can be hidden for a level video. Wanted: raft and barrel sprites (placeholder shapes for now).
+- **Fail:** falling in the sea three times (each fall, or cannonball hit, is a Miss and respawns you on a safe raft, blinking). **Win:** reaching the clip end.
+- **Art:** Cadence's side-view pirate (`pirateside1/2` as a run cycle) and sideways jump frames. A sky over the sea can be hidden for a level video. Cadence's cannonball. Wanted: raft sprites (placeholder shapes for now).
 
 ### X Marks the Spot (`x_marks_the_spot`)
 - **Prompt / hint:** `DIG!` / `← ↑ → ↓`

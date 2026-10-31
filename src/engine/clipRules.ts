@@ -46,3 +46,9 @@ export function hitTimes(meta: MiniGameMeta, clip: GameClip, bpm: number): numbe
     .filter(time => time < clip.end - 1e-6)
     .sort((a, b) => a - b)
 }
+
+// Every option the game offers, set to the clip's choice or else the option's default. This is what the
+// game gets as MiniGameParams.options.
+export function optionsFor(meta: MiniGameMeta, clip: Pick<GameClip, 'options'>): Record<string, boolean> {
+  return Object.fromEntries((meta.options ?? []).map(option => [option.id, clip.options?.[option.id] ?? option.default]))
+}

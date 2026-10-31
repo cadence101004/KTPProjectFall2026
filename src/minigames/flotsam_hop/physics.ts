@@ -1,14 +1,15 @@
-// Pure platforming logic for Flotsam Hop: how the rafts and barrels move, when rafts sink, and how the
+// Pure platforming logic for Flotsam Hop: how the rafts and cannonballs move, when rafts sink, and how the
 // pirate runs, jumps, falls, and lands. No Phaser in here, so it can be tested with plain Vitest.
 // Units: x is 0..1 across the screen, y is 0..1 down it (feet and platform tops), and speeds are in screen
 // heights per second, with x stretched by the aspect ratio so moving feels the same in every direction.
 // Everything runs on song time, per the game's core rule.
 
-export const GRAVITY = 3.2 // screen heights per second squared
-export const JUMP_SPEED = 1.35 // upward speed at the start of a jump (peaks about 0.28 screen heights up)
+export const GRAVITY = 2 // screen heights per second squared (low, for a floaty jump)
+export const JUMP_SPEED = 1.15 // upward speed at the start of a jump: about 1.15 s in the air, peaking 0.33 screen heights up
 export const RUN_SPEED = 0.6 // screen heights per second, sideways
 export const SEA_Y = 0.86 // the water line: feet below it means she fell in
-export const DRIFT_SPEED = 0.12 // how fast barrels drift right to left, in screen widths per second
+export const BALL_SPEED = 0.5 // how fast cannonballs fly right to left, in screen widths per second
+export const BALL_RADIUS = 0.03 // in screen heights
 export const WARN_BEATS = 1 // a raft shakes this long before it sinks
 export const SUNK_BEATS = 1.5 // and stays under this long
 const MIN_WARN = 0.5 // a sink with less warning than this (right at the clip start) is left out
@@ -45,9 +46,21 @@ export function raftAt(raft: Raft, songTime: number, beatLength: number): { x: n
   return { x: raft.x + (raft.slide ? wave(raft.slideBeats) * raft.slide : 0), y: raft.y + wave(raft.bobBeats) * raft.bob }
 }
 
-// Where a barrel that set off from the right edge at `launchedAt` is: drifting left at DRIFT_SPEED.
-export function barrelX(launchedAt: number, songTime: number): number {
-  return 1.1 - (songTime - launchedAt) * DRIFT_SPEED
+// Where a cannonball fired at `launchedAt` is: flying across at BALL_SPEED from off the right edge, or off
+// the left edge when `fromLeft`.
+export function ballX(launchedAt: number, songTime: number, fromLeft = false): number {
+  const flown = (songTime - launchedAt) * BALL_SPEED
+  return fromLeft ? -0.1 + flown : 1.1 - flown
+}
+
+const PIRATE_HALF_WIDTH = 0.035 // her hit box, in screen heights (a little narrower than the art, to be fair)
+const PIRATE_HEIGHT = 0.17
+
+// Whether a cannonball at (x, y) touches the pirate, whose feet are at body.x, body.y. Distances are
+// measured on the real screen shape, like everything else here.
+export function ballHits(body: Body, x: number, y: number, aspect: number): boolean {
+  const across = Math.abs(x - body.x) * aspect
+  return across < PIRATE_HALF_WIDTH + BALL_RADIUS && y + BALL_RADIUS > body.y - PIRATE_HEIGHT && y - BALL_RADIUS < body.y
 }
 
 // When a raft sinks (song times). Beat sync on: one per beat map hit. Off: random gaps through the clip.
