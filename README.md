@@ -1,4 +1,4 @@
-# PirateWare
+# Ship Happens!
 
 A WarioWare-style pirate rhythm game. Players survive a rapid-fire sequence of pirate minigames synced to music, with only 3 lives to spare. A built-in timeline editor lets anyone upload their own song, lay out minigames and breather zones like clips in a video editor, and share the result as a single downloadable level pack.
 
