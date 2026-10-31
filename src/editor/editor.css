@@ -162,15 +162,13 @@
   min-width: 100%;
 }
 
+/* Not overflow: hidden, so the edge handles can stick out past the block (the label clips itself instead). */
 .editor .media-block {
   position: absolute;
   top: 4px;
   bottom: 4px;
   box-sizing: border-box;
-  padding: 0 6px;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  padding: 0 10px;
   font-size: 12px;
   line-height: 26px;
   color: #fff;
@@ -241,4 +239,53 @@
 
 .editor .timeline-scrollbar.full .timeline-thumb {
   opacity: 0.35; /* the whole song is in view, so there's nothing to scroll */
+}
+
+.editor .media-label {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+/* Grab handles on each media block's edges, 14 px wide and sticking 6 px out past the edge (a lip), so an
+   edge is easy to catch. Drag one to trim that end. They light up while the block is hovered. */
+.editor .media-handle {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 14px;
+  background: rgba(255, 255, 255, 0.22);
+  z-index: 1;
+}
+
+.editor .media-handle.start {
+  left: -7px;
+  border-radius: 4px 0 0 4px;
+}
+
+.editor .media-handle.end {
+  right: -7px;
+  border-radius: 0 4px 4px 0;
+}
+
+.editor .media-block:hover .media-handle {
+  background: rgba(255, 204, 77, 0.7);
+}
+
+.editor .warning {
+  margin: 0;
+  padding: 6px 10px;
+  border-left: 3px solid #ffb347;
+  background: rgba(255, 179, 71, 0.12);
+}
+
+.editor .warning[hidden] {
+  display: none;
+}
+
+.editor .needs {
+  opacity: 0.65;
+  font-size: 0.85rem;
 }

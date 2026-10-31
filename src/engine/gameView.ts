@@ -7,18 +7,21 @@ import type { LevelScene } from './LevelScene'
 
 // Setup shared by every page that shows the game: the Play page, the editor preview, and the sandbox.
 
-// Starts Phaser in the element with id `parent`, running `scene`, at the game's 480x270 pixel-art size
-// scaled to fit. Waits for the game font first so text never gets stuck in a fallback font.
+// Starts Phaser in the element with id `parent`, running `scene`. The game is drawn in full HD so text and
+// art are sharp (sizes in minigames are fractions of the screen, or design pixels via shared/units.ts).
+// EXPAND grows the canvas to fill whatever shape its parent is, so a fullscreen game covers the whole
+// monitor instead of sitting between black bars. Waits for the game font first so text never gets stuck
+// in a fallback font.
 export async function createGameView(parent: string, scene: Phaser.Scene): Promise<Phaser.Game> {
   await loadGameFont()
   return new Phaser.Game({
     type: Phaser.AUTO,
     parent,
-    width: 480,
-    height: 270,
+    width: 1920,
+    height: 1080,
     transparent: true, // so the media track behind the canvas shows through; the stage's CSS color is the default background
-    pixelArt: true,
-    scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+    pixelArt: true, // keeps sprites crisp when scaled
+    scale: { mode: Phaser.Scale.EXPAND, autoCenter: Phaser.Scale.CENTER_BOTH },
     scene: [scene],
   })
 }

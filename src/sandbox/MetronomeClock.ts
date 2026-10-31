@@ -1,15 +1,23 @@
 import type { TimeSource } from '../engine/LevelRunner'
+import { loadLatencyMs } from '../settings/timing'
 
 const START_LEAD = 0.05 // seconds, same idea as AudioClock
 const SCHEDULE_AHEAD = 0.1 // seconds of clicks queued in advance so they land exactly on the beat
 
-// Song clock for the sandbox, where there is no song: AudioContext time plus a click on every beat.
+// Song clock for the sandbox and the calibration page, where there is no song: AudioContext time plus a
+// click on every beat.
 export class MetronomeClock implements TimeSource {
   private readonly ctx = new AudioContext()
+  private readonly latency: number // seconds songTime() runs behind the clicks; see AudioClock
   private startedAt = 0
   private running = false
   private bpm = 120
   private nextClick = 0 // beat number of the next click to schedule
+
+  // Uses the player's calibrated latency by default. The calibration page passes 0 to measure it.
+  constructor(latencySeconds = loadLatencyMs() / 1000) {
+    this.latency = latencySeconds
+  }
 
   // Starts song time at 0 with a click on beat 0. The first call must come from a user gesture.
   async start(bpm: number): Promise<void> {
@@ -24,8 +32,9 @@ export class MetronomeClock implements TimeSource {
     this.running = false
   }
 
+  // Beat n's click is heard at song time n * beat length (once latency is calibrated).
   songTime(): number {
-    return this.running ? this.ctx.currentTime - this.startedAt : 0
+    return this.running ? this.ctx.currentTime - this.startedAt - this.latency : 0
   }
 
   // Call every frame. Queues the clicks due in the next SCHEDULE_AHEAD seconds on the audio clock.

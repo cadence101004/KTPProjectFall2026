@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import { hitTimes, repsFor } from '../engine/clipRules'
 import { allGames } from '../minigames/allGames'
 import { textStyle } from '../minigames/shared/font'
+import { u } from '../minigames/shared/units'
 import type { GameClip } from '../types/level'
 import type { GameInput, MiniGame, MiniGameParams } from '../types/minigame'
 import type { MetronomeClock } from './MetronomeClock'
@@ -35,7 +36,7 @@ export class SandboxScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.hud = this.add.text(8, 8, 'Pick a game and press Start', textStyle(12)).setDepth(1000)
+    this.hud = this.add.text(u(this, 8), u(this, 8), 'Pick a game and press Start', textStyle(u(this, 12))).setDepth(1000)
     for (const phase of ['down', 'move', 'up'] as const) {
       this.input.on(`pointer${phase}`, (pointer: Phaser.Input.Pointer) => {
         const x = Phaser.Math.Clamp(pointer.x / this.scale.width, 0, 1)
@@ -78,6 +79,7 @@ export class SandboxScene extends Phaser.Scene {
       bpm: run.bpm,
       beatSync: meta.kind === 'task' || (run.beatSync && meta.canBeatSync),
       hits: hitTimes(meta, clip, run.bpm),
+      report: () => {}, // the sandbox plays one game on its own, with no level score to count toward
       difficulty: run.difficulty,
     }
     this.endTime = startTime + duration

@@ -37,7 +37,7 @@ What's in `params`: `scene` (draw here), `startTime` (song time your clip starts
 One beat lasts `60 / params.bpm` seconds. Use it to put cues and animations on the beat.
 
 **Beat maps (`params.hits`):** if your game has discrete moments, like "press on the beat" or "a slam lands now", give `meta` a `defaultHits` pattern (beats from the start of one cycle; for duration games, one 4-beat bar). Level designers can then add, remove, or move every hit in the editor, osu-style, including offbeats. Your game gets the result as `params.hits`: song times, in order.
-- **Task games:** judge each press with `judgePress` from `src/minigames/shared/judgePress.ts`, so every rhythm game has the same timing feel. A press within ±`HIT_WINDOW` (0.16 s) of the hit counts. Pressing too early (in the run-up to a hit) or letting the window pass fails the game. The task template shows how, with an approach ring.
+- **Task games:** judge each press with `judgePress` from `src/minigames/shared/judgePress.ts`, so every rhythm game has the same timing feel. A press is graded **PERFECT** (±35 ms), **GREAT** (±80 ms), or **GOOD** (±160 ms), the same early and late; show it with `showJudgement` from `shared/judgeText.ts`. Pressing too early (in the run-up to a hit) or letting the window pass is a **MISS** for that hit, and play carries on. The game only fails once `tooManyMisses` says a quarter or more of the hits were missed. Also call `params.report(grade)` for every hit and miss so it counts toward the level's score and rank (games without hits skip this; the engine scores them by whether the clip was won). The task template shows all of this in its `judged()` helper, with an approach ring.
 - **Beat-synced duration games:** make each hazard land at a time in `params.hits`.
 - `params.hits` is `null` when your game has no `defaultHits` (e.g. Swab the Deck) or beat sync is off, so fall back to your own timing.
 
@@ -50,7 +50,7 @@ One beat lasts `60 / params.bpm` seconds. Use it to put cues and animations on t
 3. **`'failed'` is final.** Once a game has failed, it stays failed. The engine takes away a life, and the music keeps going.
 4. **Clean up.** Add every game object you create to `this.objects` so `destroy()` removes it. Anything left behind will show up in the next minigame.
 5. **Text uses the game font (Pixelify Sans).** Phaser draws text onto a canvas where page CSS doesn't reach, so create text with `textStyle` from `src/minigames/shared/font.ts`: `scene.add.text(x, y, 'FIRE!', textStyle(24, { color: '#ffcc4d' }))`.
-6. **Size things relative to the screen.** Use `params.scene.scale.width` and `height`, not fixed pixel positions.
+6. **Size things relative to the screen.** The game is drawn in full HD and the screen can be any shape (it fills the monitor in fullscreen), so never use fixed positions. Use fractions of `params.scene.scale.width` and `height`, and for fixed sizes like a line's thickness or a font size use design pixels: `u(scene, 3)` from `src/minigames/shared/units.ts` means 3 pixels at the original 480x270 design size.
 6. **Use the abstract buttons.** Listen for `'left'`, `'right'`, `'up'`, `'down'`, `'action'`, or pointer input (`x`, `y` from 0 to 1). Never read the keyboard directly, so touch and gamepad work for free.
 7. **Never import from another minigame or from `src/engine/`.** Import types from `src/types/minigame.ts` and shared helpers from `src/minigames/shared/` only.
 

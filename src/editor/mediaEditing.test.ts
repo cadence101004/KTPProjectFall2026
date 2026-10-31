@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { MediaClip } from '../types/level'
-import { cutMedia } from './mediaEditing'
+import { cutMedia, trimMedia } from './mediaEditing'
 
 const video: MediaClip = {
   kind: 'video',
@@ -11,6 +11,37 @@ const video: MediaClip = {
   mediaOffset: 3,
   effects: { blur: 8, dim: 0.4 },
 }
+
+describe('trimMedia', () => {
+  // `video` starts at song time 10, 3 s into its file, and ends at 20.
+
+  it('moves the end edge', () => {
+    expect(trimMedia(video, 'end', 16).end).toBe(16)
+  })
+
+  it('keeps the video in place when trimming the start later', () => {
+    const trimmed = trimMedia(video, 'start', 12)
+    expect(trimmed.start).toBe(12)
+    expect(trimmed.mediaOffset).toBe(5) // 2 s further into the file, so the same scene plays at song time 12
+  })
+
+  it('reveals earlier footage when dragging the start back, down to the file start', () => {
+    expect(trimMedia(video, 'start', 8).mediaOffset).toBe(1)
+    const atFileStart = trimMedia(video, 'start', 2) // would need 5 s before the file began
+    expect(atFileStart.start).toBe(7)
+    expect(atFileStart.mediaOffset).toBe(0)
+  })
+
+  it('never makes a clip shorter than the minimum piece', () => {
+    expect(trimMedia(video, 'end', 9).end).toBeCloseTo(10.25)
+    expect(trimMedia(video, 'start', 25).start).toBeCloseTo(19.75)
+  })
+
+  it('lets an image start anywhere', () => {
+    const image = { ...video, kind: 'image' as const, mediaOffset: 0 }
+    expect(trimMedia(image, 'start', 2).start).toBe(2)
+  })
+})
 
 describe('cutMedia', () => {
   it('splits a clip at the cut point', () => {

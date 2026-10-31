@@ -7,6 +7,7 @@ const sections = [
   { href: '/play.html', title: 'Play', blurb: 'Pick a level and set sail.', disabled: false },
   { href: '/editor.html', title: 'Level Editor', blurb: 'Chart minigames to your own songs, then preview them.' },
   { href: '/sandbox.html', title: 'Minigame Sandbox', blurb: 'Try one minigame on its own with a metronome.' },
+  { href: '/calibrate.html', title: 'Timing Calibration', blurb: 'Line the beat up with your speakers or headphones.' },
   { href: '/debug.html', title: 'Debug', blurb: 'The step 1 test page: clip timing against a song.' },
 ]
 

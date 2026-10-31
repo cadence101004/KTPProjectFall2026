@@ -94,10 +94,13 @@ export class Timeline {
     Object.assign(this.grid.style, { position: 'absolute', inset: '0', pointerEvents: 'none', zIndex: '1' })
   }
 
-  // wavesurfer and its Regions plugin draw inside a shadow DOM and set their own system cursors on clips
-  // (grab, default, col-resize), which hid the pirate hook there. This puts a small stylesheet inside that
-  // shadow DOM. The cursor variables come from src/ui/cursor.ts and are inherited into it; !important beats
-  // the plugin's inline cursors; :host-context follows the page's pressing and dragging states.
+  // wavesurfer and its Regions plugin draw inside a shadow DOM, where page CSS can't reach, so this puts a
+  // small stylesheet inside it (!important beats the plugin's inline styles):
+  // - Cursors: the plugin sets system cursors on clips, which hid the pirate hook there. The cursor variables
+  //   come from src/ui/cursor.ts and are inherited into the shadow DOM; :host-context follows the page's
+  //   pressing and dragging states.
+  // - Grab lips: the plugin's resize handles are 6 px strips inside each clip's edge, hard to catch. These
+  //   widen them to 14 px and push them 6 px past the edge, and light them up while the clip is hovered.
   private useHookCursors(): void {
     const root = this.waves.getWrapper().getRootNode()
     if (!(root instanceof ShadowRoot)) return
@@ -107,6 +110,11 @@ export class Timeline {
       [part~='region'], [part~='region'] * { cursor: var(--cursor-hover, grab) !important; }
       :host-context(html.pressing) * { cursor: var(--cursor-press, pointer) !important; }
       :host-context(html.dragging) * { cursor: var(--cursor-drag, grabbing) !important; }
+
+      [part~='region-handle'] { width: 14px !important; border: none !important; }
+      [part~='region-handle-left'] { left: -6px !important; border-radius: 4px 0 0 4px !important; }
+      [part~='region-handle-right'] { right: -6px !important; border-radius: 0 4px 4px 0 !important; }
+      [part~='region']:hover [part~='region-handle'] { background: rgba(255, 204, 77, 0.45); }
     `
     root.append(style)
   }
@@ -195,22 +203,41 @@ export class Timeline {
       block.dataset.index = String(index)
       block.style.left = `${(clip.start / this.duration) * 100}%`
       block.style.width = `${((clip.end - clip.start) / this.duration) * 100}%`
-      block.textContent = clip.label
+      // The label, plus a grab handle on each edge that sticks out past it (a lip), for trimming.
+      const label = Object.assign(document.createElement('span'), { className: 'media-label', textContent: clip.label })
+      const handles = (['start', 'end'] as const).map(side => {
+        const handle = document.createElement('div')
+        handle.className = `media-handle ${side}`
+        handle.dataset.side = side
+        return handle
+      })
+      block.append(label, ...handles)
       return block
     })
     this.mediaTrack.replaceChildren(...blocks, this.mediaPlayhead)
   }
 
-  // Clicking a media block selects it; dragging it moves it. `move` gets the dropped start time, before
-  // any no-overlap rules (the editor applies those).
-  onMediaEdit(select: (index: number) => void, move: (index: number, start: number) => void): void {
-    let drag: { index: number; block: HTMLElement; startX: number; startLeft: number; moved: boolean } | null = null
+  // Clicking a media block selects it. Dragging one of its edge handles trims that edge (resize); dragging
+  // anywhere else moves the whole block. `move` and `resize` get the dropped time before any no-overlap or
+  // snapping rules (the editor applies those).
+  onMediaEdit(
+    select: (index: number) => void,
+    move: (index: number, start: number) => void,
+    resize: (index: number, side: 'start' | 'end', time: number) => void,
+  ): void {
+    let drag: { index: number; mode: 'move' | 'start' | 'end'; startX: number; left: number; width: number; moved: boolean } | null =
+      null
     const secondsPerPixel = () => this.duration / this.mediaTrack.getBoundingClientRect().width
+    // Selecting redraws the lane, so look the block up fresh rather than holding on to the one clicked.
+    const blockAt = (index: number) => this.mediaTrack.querySelector<HTMLElement>(`.media-block[data-index="${index}"]`)
+
     this.mediaTrack.addEventListener('pointerdown', event => {
       const block = (event.target as HTMLElement).closest<HTMLElement>('.media-block')
       if (!block) return
       const index = Number(block.dataset.index)
-      drag = { index, block, startX: event.clientX, startLeft: block.offsetLeft, moved: false }
+      const side = (event.target as HTMLElement).closest<HTMLElement>('.media-handle')?.dataset.side
+      const mode = side === 'start' || side === 'end' ? side : 'move'
+      drag = { index, mode, startX: event.clientX, left: block.offsetLeft, width: block.offsetWidth, moved: false }
       this.mediaTrack.setPointerCapture(event.pointerId)
       select(index)
     })
@@ -218,13 +245,25 @@ export class Timeline {
       if (!drag) return
       const dx = event.clientX - drag.startX
       if (Math.abs(dx) > 3) drag.moved = true
-      if (drag.moved) drag.block.style.left = `${drag.startLeft + dx}px` // live preview while dragging
+      const block = blockAt(drag.index)
+      if (!drag.moved || !block) return
+      // Live preview while dragging; the editor places it properly on release.
+      if (drag.mode === 'move') block.style.left = `${drag.left + dx}px`
+      if (drag.mode === 'end') block.style.width = `${Math.max(4, drag.width + dx)}px`
+      if (drag.mode === 'start') {
+        block.style.left = `${drag.left + dx}px`
+        block.style.width = `${Math.max(4, drag.width - dx)}px`
+      }
     })
     this.mediaTrack.addEventListener('pointerup', event => {
       if (!drag) return
-      const { index, startLeft, startX, moved } = drag
+      const { index, mode, startX, left, width, moved } = drag
       drag = null
-      if (moved) move(index, (startLeft + event.clientX - startX) * secondsPerPixel())
+      if (!moved) return
+      const dx = event.clientX - startX
+      if (mode === 'move') move(index, (left + dx) * secondsPerPixel())
+      else if (mode === 'start') resize(index, 'start', (left + dx) * secondsPerPixel())
+      else resize(index, 'end', (left + width + dx) * secondsPerPixel())
     })
   }
 

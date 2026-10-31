@@ -5,6 +5,9 @@ import type Phaser from 'phaser'
 export type GameKind = 'duration' | 'task'
 export type Status = 'running' | 'won' | 'failed'
 
+// How one hit went, for the level's score and rank (see src/minigames/shared/judgePress.ts).
+export type HitGrade = 'perfect' | 'great' | 'good' | 'miss'
+
 // Device-independent buttons. Keyboard, touch, and gamepad all map onto these.
 export type GameButton = 'left' | 'right' | 'up' | 'down' | 'action'
 
@@ -52,6 +55,9 @@ export interface MiniGameParams {
   // (beat-synced duration games). Null if the game has no defaultHits, or beat sync is off.
   hits: number[] | null
   difficulty: number
+  // Call once for each hit the player makes or misses, so it counts toward the level's score and rank.
+  // Games without discrete hits don't need it: the engine scores their clip by whether it was won.
+  report: (grade: HitGrade) => void
 }
 
 export interface MiniGame {

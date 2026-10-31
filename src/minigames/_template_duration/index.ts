@@ -2,6 +2,7 @@
 // Copy this folder to src/minigames/<your_game_id>/ and follow src/minigames/README.md.
 import type Phaser from 'phaser'
 import type { DurationMeta, GameInput, MiniGame, MiniGameParams, Status } from '../../types/minigame'
+import { u } from '../shared/units'
 
 const SPEED = 0.6 // screen widths per second
 
@@ -32,7 +33,7 @@ export class TemplateDurationGame implements MiniGame {
     this.params = params
     this.lastTime = params.startTime
     const { width, height } = params.scene.scale
-    this.player = params.scene.add.rectangle(width * this.x, height * 0.8, 24, 24, 0xffcc4d)
+    this.player = params.scene.add.rectangle(width * this.x, height * 0.8, u(params.scene, 24), u(params.scene, 24), 0xffcc4d)
     this.objects.push(this.player)
   }
 

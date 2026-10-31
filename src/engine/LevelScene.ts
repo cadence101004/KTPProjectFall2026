@@ -1,11 +1,13 @@
 import Phaser from 'phaser'
 import { allGames, metaFor } from '../minigames/allGames'
 import { textStyle } from '../minigames/shared/font'
+import { u } from '../minigames/shared/units'
 import type { Clip, GameClip, Level } from '../types/level'
-import type { GameInput, MiniGame } from '../types/minigame'
+import type { GameInput, HitGrade, MiniGame } from '../types/minigame'
 import { hitTimes, repsFor } from './clipRules'
 import { COUNT_LABELS, type CountdownCue, goLead, planCountdown } from './countdown'
 import { LevelRunner, type RunnerEvent, type TimeSource } from './LevelRunner'
+import { accuracyOf, addGrade, newSheet, type Rank, rankOf, type ScoreSheet, scoreClip, scoreOf } from './scoring'
 
 export const START_LIVES = 3
 
@@ -20,31 +22,38 @@ export interface CountdownSound {
   beats: number[]
 }
 
-// A button on the Game Over screen. The host (game or editor) decides what each one does.
+// A button on the Game Over and results screens. The host (game or editor) decides what each one does.
 export interface MenuOption {
   label: string
   action: () => void
 }
 
+const RANK_COLORS: Record<Rank, string> = { S: '#ffe066', A: '#7dffb0', B: '#7dc8ff', C: '#f4e9d0', D: '#ff9a6b' }
+
 // Plays a level: steps through its clips on the song clock, runs each minigame through the MiniGame
-// contract, shows buffer screens, and keeps lives. The editor preview and the real game both use this.
+// contract, shows buffer screens, keeps lives and score, and ends on a results screen (or Game Over).
+// The editor preview and the real game both use this.
 export class LevelScene extends Phaser.Scene {
   private readonly clock: LevelClock
   private countdownSound: CountdownSound | null = null
   private countdown: { cue: CountdownCue; hint: string } | null = null // the cue running in the current buffer
   private level: Level | null = null
   private runner: LevelRunner | null = null
-  private current: { game: MiniGame; clip: GameClip } | null = null
+  // The running minigame, plus how many hits its beat map has and how many it has reported, for scoring.
+  private current: { game: MiniGame; clip: GameClip; hitCount: number; reported: number } | null = null
   private lives = START_LIVES
   private practice = false // infinite lives: failures are counted instead
   private misses = 0
+  private sheet: ScoreSheet = newSheet()
   private running = false
-  private gameOverOptions: MenuOption[] = []
-  private gameOver: { objects: Phaser.GameObjects.GameObject[]; buttons: Phaser.GameObjects.Text[]; choice: number } | null =
+  private menuOptions: MenuOption[] = []
+  // The Game Over or results overlay, while it's up: everything it drew, its buttons, and which is chosen.
+  private menu: { objects: Phaser.GameObjects.GameObject[]; buttons: Phaser.GameObjects.Text[]; choice: number } | null =
     null
   private idleText = 'Press Start' // shown while no level is playing
   private hud!: Phaser.GameObjects.Text // lives, top left
-  private banner!: Phaser.GameObjects.Text // big center text: buffer info, prompts, results
+  private scoreText!: Phaser.GameObjects.Text // score, top right
+  private banner!: Phaser.GameObjects.Text // big center text: buffer info and the countdown
 
   constructor(clock: LevelClock) {
     super('level')
@@ -62,9 +71,15 @@ export class LevelScene extends Phaser.Scene {
     this.countdownSound = sound
   }
 
-  // The buttons on the Game Over screen, e.g. Restart Level and Main Menu.
+  // Where the 3, 2, 1, GO counts fall inside the countdown sound, or null until it has loaded. The editor
+  // uses this to show the auto countdown speed and to warn about buffers too short for the countdown.
+  countdownFileBeats(): number[] | null {
+    return this.countdownSound?.beats ?? null
+  }
+
+  // The buttons on the Game Over and results screens, e.g. Restart Level and Main Menu.
   setGameOverOptions(options: MenuOption[]): void {
-    this.gameOverOptions = options
+    this.menuOptions = options
   }
 
   // Practice mode: no Game Over; failures are counted on the HUD instead of costing lives.
@@ -78,11 +93,14 @@ export class LevelScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.hud = this.add.text(8, 8, '', textStyle(14)).setDepth(1000)
+    this.hud = this.add.text(0, 0, '', textStyle(u(this, 14))).setDepth(1000)
+    this.scoreText = this.add.text(0, 0, '', textStyle(u(this, 14))).setOrigin(1, 0).setDepth(1000)
     this.banner = this.add
-      .text(this.scale.width / 2, this.scale.height / 2, this.idleText, textStyle(18, { align: 'center' }))
+      .text(0, 0, this.idleText, textStyle(u(this, 18), { align: 'center' }))
       .setOrigin(0.5)
       .setDepth(1000)
+    this.layoutHud()
+    this.scale.on('resize', () => this.layoutHud()) // e.g. entering fullscreen changes the screen's shape
     for (const phase of ['down', 'move', 'up'] as const) {
       this.input.on(`pointer${phase}`, (pointer: Phaser.Input.Pointer) => {
         const x = Phaser.Math.Clamp(pointer.x / this.scale.width, 0, 1)
@@ -92,15 +110,25 @@ export class LevelScene extends Phaser.Scene {
     }
   }
 
-  // Starts playing `level` from song time `time`, with full lives. The caller starts the audio there too.
+  // Places the lives, score, and center banner for the current screen size.
+  private layoutHud(): void {
+    const { width, height } = this.scale
+    this.hud.setPosition(u(this, 8), u(this, 8))
+    this.scoreText.setPosition(width - u(this, 8), u(this, 8))
+    this.banner.setPosition(width / 2, height / 2)
+  }
+
+  // Starts playing `level` from song time `time`, with full lives and a fresh score. The caller starts
+  // the audio there too.
   startAt(level: Level, time: number): void {
     this.endCurrent(false)
-    this.hideGameOver()
+    this.hideMenu()
     this.level = level
     this.runner = new LevelRunner(level, this.clock)
     this.runner.seek(time)
     this.lives = START_LIVES
     this.misses = 0
+    this.sheet = newSheet()
     this.countdown = null
     this.running = true
     this.banner.setText('')
@@ -110,25 +138,26 @@ export class LevelScene extends Phaser.Scene {
   // Stops playing and clears the screen.
   stop(): void {
     this.endCurrent(false)
-    this.hideGameOver()
+    this.hideMenu()
     this.running = false
     this.runner = null
     this.countdown = null
     this.banner.setText(this.idleText)
     this.hud.setText('')
+    this.scoreText.setText('')
   }
 
-  // Forwards input to the running minigame, or to the Game Over menu while it's up.
+  // Forwards input to the running minigame, or to the Game Over / results menu while it's up.
   send(input: GameInput): void {
-    if (this.gameOver) this.menuInput(input)
+    if (this.menu) this.menuInput(input)
     else this.current?.game.handleInput(input)
   }
 
   update(): void {
-    if (!this.running || !this.runner || this.gameOver) return
+    if (!this.running || !this.runner || this.menu) return
     for (const event of this.runner.update()) {
       this.handle(event)
-      if (this.gameOver) return // nothing else runs after Game Over; the music plays on underneath
+      if (this.menu) return // nothing else runs after Game Over or the results; the music plays on underneath
     }
     const time = this.clock.songTime()
     this.current?.game.update(time)
@@ -137,7 +166,7 @@ export class LevelScene extends Phaser.Scene {
 
   private handle(event: RunnerEvent): void {
     if (event.type === 'levelEnd') {
-      this.banner.setText(this.practice ? `LEVEL COMPLETE!\n\n${this.misses} misses` : 'LEVEL COMPLETE!')
+      this.showResults()
       return
     }
     const clip = event.clip
@@ -162,6 +191,8 @@ export class LevelScene extends Phaser.Scene {
     this.countdown = null
     const game = make()
     const duration = clip.end - clip.start
+    const hits = hitTimes(meta, clip, this.level.bpm)
+    const current = { game, clip, hitCount: hits?.length ?? 0, reported: 0 }
     game.start({
       scene: this,
       startTime: clip.start,
@@ -169,24 +200,31 @@ export class LevelScene extends Phaser.Scene {
       reps: repsFor(meta, duration, this.level.bpm),
       bpm: this.level.bpm,
       beatSync: meta.kind === 'task' || (!!clip.beatSync && meta.canBeatSync),
-      hits: hitTimes(meta, clip, this.level.bpm),
+      hits,
       difficulty: clip.difficulty,
+      report: (grade: HitGrade) => {
+        if (this.current !== current) return // a stray report after the clip ended
+        current.reported++
+        addGrade(this.sheet, grade)
+        this.drawHud()
+      },
     })
-    this.current = { game, clip }
+    this.current = current
     this.flash(meta.prompt)
   }
 
-  // Ends the running minigame. When `judge` is set, a failure (or a task game still running) costs a life,
-  // or in practice mode adds a miss. Losing the last life brings up Game Over.
+  // Ends the running minigame. When `judge` is set, the clip is scored, and a failure (or a task game still
+  // running) costs a life, or in practice mode adds a miss. Losing the last life brings up Game Over.
   private endCurrent(judge: boolean): void {
     if (!this.current) return
-    const { game, clip } = this.current
+    const { game, clip, hitCount, reported } = this.current
     this.current = null
     let outOfLives = false
     if (judge) {
       game.update(clip.end) // lets a task game see its last window close
       const status = game.status()
       const failed = status === 'failed' || (status === 'running' && game.meta.kind === 'task')
+      scoreClip(this.sheet, !failed, reported, hitCount)
       if (failed && this.practice) {
         this.misses++
         this.flash('MISS!')
@@ -201,51 +239,78 @@ export class LevelScene extends Phaser.Scene {
     if (outOfLives) this.showGameOver()
   }
 
-  // Game Over: the level stops (the music keeps going) and a menu offers the host's options.
+  // Game Over: the level stops (the music keeps going), with the score so far and the host's options.
   private showGameOver(): void {
+    this.showMenu('GAME OVER', '#ff6b6b', null, [`Score ${scoreOf(this.sheet).toLocaleString()}`])
+  }
+
+  // The level's end: a big rank letter, the score, accuracy, how each hit went, and the host's options.
+  private showResults(): void {
+    const { perfect, great, good, miss } = this.sheet.grades
+    const cleared = this.sheet.games - this.sheet.fails
+    const status = this.practice ? `Practice: ${this.misses} minigames missed` : `Lives left ${'♥'.repeat(this.lives)}`
+    this.showMenu(this.practice ? 'LEVEL COMPLETE (PRACTICE)' : 'LEVEL COMPLETE!', '#ffcc4d', rankOf(this.sheet), [
+      `Score ${scoreOf(this.sheet).toLocaleString()}    Accuracy ${(accuracyOf(this.sheet) * 100).toFixed(1)}%`,
+      `Perfect ${perfect}   Great ${great}   Good ${good}   Miss ${miss}`,
+      `Minigames cleared ${cleared} / ${this.sheet.games}    ${status}`,
+    ])
+  }
+
+  // An overlay with a title, an optional rank letter, a few lines of stats, and the host's buttons along the
+  // bottom. Arrows (or the mouse) choose a button; action picks it.
+  private showMenu(title: string, color: string, rank: Rank | null, lines: string[]): void {
     this.countdown = null
     this.banner.setText('')
     const { width, height } = this.scale
-    const shade = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.7).setDepth(2000)
-    const title = this.add
-      .text(width / 2, height * 0.32, 'GAME OVER', textStyle(40, { fontStyle: 'bold', color: '#ff6b6b' }))
-      .setOrigin(0.5)
-      .setDepth(2001)
-    const buttons = this.gameOverOptions.map((option, index) =>
-      this.add
-        .text(width / 2, height * 0.58 + index * 34, option.label, textStyle(20, { padding: { x: 12, y: 4 } }))
+    const objects: Phaser.GameObjects.GameObject[] = []
+    const text = (y: number, content: string, size: number, style: Phaser.Types.GameObjects.Text.TextStyle = {}) => {
+      const label = this.add.text(width / 2, y, content, textStyle(size, style)).setOrigin(0.5).setDepth(2001)
+      objects.push(label)
+      return label
+    }
+    objects.push(this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.75).setDepth(2000))
+    text(height * (rank ? 0.12 : 0.3), title, u(this, rank ? 22 : 40), { fontStyle: 'bold', color })
+    if (rank) text(height * 0.33, rank, u(this, 72), { fontStyle: 'bold', color: RANK_COLORS[rank] })
+    lines.forEach((line, i) => text(height * (rank ? 0.56 : 0.5) + i * u(this, 18), line, u(this, 12)))
+
+    const buttons = this.menuOptions.map((option, index) => {
+      const x = width / 2 + (index - (this.menuOptions.length - 1) / 2) * u(this, 170)
+      const button = this.add
+        .text(x, height * 0.86, option.label, textStyle(u(this, 18), { padding: { x: u(this, 12), y: u(this, 4) } }))
         .setOrigin(0.5)
         .setDepth(2001)
         .setInteractive({ useHandCursor: true })
         .on('pointerover', () => this.chooseMenu(index))
-        .on('pointerdown', () => option.action()),
-    )
-    this.gameOver = { objects: [shade, title, ...buttons], buttons, choice: 0 }
+        .on('pointerdown', () => option.action())
+      objects.push(button)
+      return button
+    })
+    this.menu = { objects, buttons, choice: 0 }
     this.chooseMenu(0)
   }
 
-  private hideGameOver(): void {
-    for (const object of this.gameOver?.objects ?? []) object.destroy()
-    this.gameOver = null
+  private hideMenu(): void {
+    for (const object of this.menu?.objects ?? []) object.destroy()
+    this.menu = null
   }
 
-  // Highlights one Game Over button.
+  // Highlights one menu button.
   private chooseMenu(choice: number): void {
-    if (!this.gameOver) return
-    this.gameOver.choice = choice
-    this.gameOver.buttons.forEach((button, index) => {
+    if (!this.menu) return
+    this.menu.choice = choice
+    this.menu.buttons.forEach((button, index) => {
       button.setColor(index === choice ? '#123047' : '#ffffff')
       button.setBackgroundColor(index === choice ? '#ffcc4d' : '#00000000')
     })
   }
 
-  // Arrows move between Game Over buttons; action picks one.
+  // Arrows move between menu buttons; action picks one.
   private menuInput(input: GameInput): void {
-    if (!this.gameOver || input.kind !== 'button' || !input.pressed) return
-    const count = this.gameOver.buttons.length
-    if (input.button === 'up' || input.button === 'left') this.chooseMenu((this.gameOver.choice + count - 1) % count)
-    if (input.button === 'down' || input.button === 'right') this.chooseMenu((this.gameOver.choice + 1) % count)
-    if (input.button === 'action') this.gameOverOptions[this.gameOver.choice]?.action()
+    if (!this.menu || input.kind !== 'button' || !input.pressed) return
+    const count = this.menu.buttons.length
+    if (input.button === 'up' || input.button === 'left') this.chooseMenu((this.menu.choice + count - 1) % count)
+    if (input.button === 'down' || input.button === 'right') this.chooseMenu((this.menu.choice + 1) % count)
+    if (input.button === 'action') this.menuOptions[this.menu.choice]?.action()
   }
 
   // Buffer screen: lives left and what's coming next. If a minigame follows, the 321GO cue is scheduled
@@ -272,7 +337,7 @@ export class LevelScene extends Phaser.Scene {
   // Briefly shows big text, e.g. a minigame's prompt.
   private flash(text: string): void {
     const label = this.add
-      .text(this.scale.width / 2, this.scale.height * 0.25, text, textStyle(32, { fontStyle: 'bold', color: '#ffcc4d' }))
+      .text(this.scale.width / 2, this.scale.height * 0.25, text, textStyle(u(this, 32), { fontStyle: 'bold', color: '#ffcc4d' }))
       .setOrigin(0.5)
       .setDepth(1001)
     this.tweens.add({ targets: label, alpha: 0, scale: 1.3, duration: 600, onComplete: () => label.destroy() })
@@ -284,6 +349,7 @@ export class LevelScene extends Phaser.Scene {
         ? `Practice   misses: ${this.misses}`
         : `${'♥'.repeat(this.lives)}${'♡'.repeat(START_LIVES - this.lives)}`,
     )
+    this.scoreText.setText(scoreOf(this.sheet).toLocaleString())
   }
 }
 

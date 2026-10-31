@@ -2,8 +2,10 @@ import '../style.css'
 import './editor.css'
 import { AudioClock } from '../audio/AudioClock'
 import { installPirateCursor, setWaiting } from '../ui/cursor'
+import { fullscreenButton } from '../ui/fullscreen'
 import { hashFile } from '../audio/hash'
 import { defaultHits, hitTimes, repsFor, usesBeatMap } from '../engine/clipRules'
+import { autoCountdownRate, countdownNeeds, shortCountdownBuffers } from '../engine/countdown'
 import { createGameView, loadCountdownSound } from '../engine/gameView'
 import { listenForKeys } from '../engine/input'
 import { LevelScene } from '../engine/LevelScene'
@@ -15,7 +17,7 @@ import type { Clip, GameClip, Level, MediaClip } from '../types/level'
 import type { MiniGameMeta } from '../types/minigame'
 import { type BeatGrid, beatTimes, snapToGrid } from './beatGrid'
 import { freeGaps, placeMove, placeResize, snapLength } from './clipEditing'
-import { cutMedia } from './mediaEditing'
+import { cutMedia, trimMedia } from './mediaEditing'
 import { computePeaks } from './peaks'
 import { previewStart } from './preview'
 import { type ClipView, Timeline } from './Timeline'
@@ -39,8 +41,12 @@ app.innerHTML = `
       <button id="preview" disabled title="Play the level from the playhead in the gameplay view (P)">Preview</button>
       <label title="Misses are counted instead of costing lives, so the preview never ends in Game Over">
         <input id="practice" type="checkbox" checked /> Practice</label>
+      <button id="fullscreen" title="Fill the screen with the gameplay view (F). Esc leaves fullscreen.">Fullscreen</button>
       <span class="time"><b id="time">0.00</b> / <span id="length">0.00</span> s</span>
       <label>BPM <input id="bpm" type="number" min="40" max="300" step="0.01" value="120" /></label>
+      <label title="Speed of the 3, 2, 1, GO countdown. Leave empty for auto: one count per beat.">Countdown
+        <input id="countdownRate" type="number" min="0.25" max="4" step="0.05" placeholder="auto" /> x
+        <span id="countdownNeeds" class="needs"></span></label>
       <label>First beat (s) <input id="offset" type="number" min="0" step="0.01" value="0" /></label>
       <button id="setOffset" disabled title="Set the first beat to the playhead">Beat here</button>
       <label>Snap <select id="snap">
@@ -68,14 +74,15 @@ app.innerHTML = `
       ${Object.keys(allGames).map(id => `<button data-add="${id}">${id}</button>`).join('')}
       <button id="delete" class="danger" disabled>Delete clip</button>
     </div>
+    <p id="countdownWarning" class="warning" hidden></p>
     <p id="selection" class="selection">No clip selected.</p>
     <div id="clipOptions" class="clip-options"></div>
     <p class="help">Drag the yellow handle in the bar above the waveform to move the playhead (works mid-preview too),
       or click empty waveform. Space plays and pauses. Drag a clip to move it,
       drag its edges to resize. Delete removes the selected clip. Set BPM and the first beat so the grid lines
-      land on the drums; clip edges then snap to the grid. Cut (C) splits the media under the playhead so each
+      land on the drums; clip edges then snap to the grid. Drag a media block's edges to trim it. Cut (C) splits the media under the playhead so each
       piece can have its own blur and dim. Ctrl+S saves. Preview (P) plays the level as a player
-      sees it, with the game controls live; Esc stops it.</p>
+      sees it, with the game controls live; Esc stops it. Fullscreen (F) fills the screen with the gameplay view.</p>
   </div>`
 
 const $ = <T extends HTMLElement>(id: string) => app.querySelector<T>('#' + id)!
@@ -86,7 +93,7 @@ const timeline = new Timeline($('waveform'))
 const levelScene = new LevelScene(clock)
 
 void createGameView('stage', levelScene)
-void loadCountdownSound(clock, levelScene)
+void loadCountdownSound(clock, levelScene).then(render) // render again to show the auto countdown speed
 
 // In the editor, Restart replays the preview from where it began, and Main Menu goes back to editing.
 let previewOrigin = 0
@@ -248,6 +255,24 @@ function render(): void {
     : 'No clip selected.'
   renderClipOptions(clip)
   renderMedia()
+  renderCountdown()
+}
+
+// The countdown speed field's "auto" hint, and a warning when buffers are too short for the whole
+// countdown. Waits for the countdown sound, since both depend on where its counts fall.
+function renderCountdown(): void {
+  const fileBeats = levelScene.countdownFileBeats()
+  if (!fileBeats) return
+  $<HTMLInputElement>('countdownRate').placeholder = `auto ${autoCountdownRate(fileBeats, level.bpm).toFixed(2)}`
+  const needs = countdownNeeds(fileBeats, level.bpm, level.countdownRate)
+  $('countdownNeeds').textContent = `(buffers need ${needs.toFixed(2)} s)`
+  const short = shortCountdownBuffers(level.clips, needs)
+  const warning = $('countdownWarning')
+  warning.hidden = short.length === 0
+  warning.textContent =
+    `${short.length} buffer${short.length === 1 ? ' is' : 's are'} shorter than the countdown needs ` +
+    `(${needs.toFixed(2)} s at this speed), so the countdown there starts partway. ` +
+    'Lengthen them, or speed up the countdown.'
 }
 
 // The media track: lane blocks, the on/off switch, the live background layer, and the selected clip's settings.
@@ -382,6 +407,17 @@ function moveMedia(index: number, start: number): void {
   render()
 }
 
+// Applies an edge drag on the media lane: the edge snaps to the beat grid and stops at the neighbouring
+// media clips (and the song's ends), then trimMedia keeps the video in place if the start moved.
+function resizeMedia(index: number, side: 'start' | 'end', time: number): void {
+  const clip = level.media[index]
+  const gap = freeGaps(level.media, index, songLength).find(g => clip.start >= g.start - 1e-6 && clip.end <= g.end + 1e-6)
+  if (!gap) return
+  const to = Math.min(gap.end, Math.max(gap.start, snapToGrid(time, grid())))
+  Object.assign(clip, trimMedia(clip, side, to))
+  render()
+}
+
 // Splits the media clip under the playhead in two (snapped to the beat grid), so each piece can get its
 // own blur and dim, or be deleted to cut a scene out. The second piece is selected afterwards.
 function cutMediaAtPlayhead(): void {
@@ -483,6 +519,16 @@ function syncInputs(): void {
   $<HTMLInputElement>('title').value = level.title
   $<HTMLInputElement>('bpm').value = String(level.bpm)
   $<HTMLInputElement>('offset').value = level.beatOffset.toFixed(2)
+  $<HTMLInputElement>('countdownRate').value = level.countdownRate === undefined ? '' : String(level.countdownRate)
+}
+
+// A countdown speed from the field: a number sets it, empty (or nonsense) goes back to auto.
+function changeCountdownRate(text: string): void {
+  const rate = Number(text)
+  if (text.trim() === '' || !(rate > 0)) delete level.countdownRate
+  else level.countdownRate = Math.min(4, Math.max(0.25, rate))
+  syncInputs()
+  render()
 }
 
 // Adds a clip at the playhead. gameId '' means a buffer.
@@ -695,6 +741,7 @@ $('load').addEventListener('click', () => {
 $('new').addEventListener('click', startNewLevel)
 playButton.addEventListener('click', togglePlay)
 $('preview').addEventListener('click', () => (previewing ? pause() : void startPreview()))
+fullscreenButton($<HTMLButtonElement>('fullscreen'), $('stage'))
 $<HTMLInputElement>('practice').addEventListener('change', event => {
   levelScene.setPractice((event.target as HTMLInputElement).checked)
 })
@@ -704,7 +751,7 @@ listenForKeys(clock, input => {
 timeline.onSeek(seek)
 timeline.onScrub(scrub)
 timeline.onClipEdit(editClip)
-timeline.onMediaEdit(selectMedia, moveMedia)
+timeline.onMediaEdit(selectMedia, moveMedia, resizeMedia)
 $('cutMedia').addEventListener('click', cutMediaAtPlayhead)
 $<HTMLInputElement>('mediaOn').addEventListener('change', event => {
   level.mediaEnabled = (event.target as HTMLInputElement).checked
@@ -723,6 +770,9 @@ timeline.onClipClick(index => {
 })
 $<HTMLInputElement>('zoom').addEventListener('input', event => {
   timeline.zoom(Number((event.target as HTMLInputElement).value))
+})
+$<HTMLInputElement>('countdownRate').addEventListener('change', event => {
+  changeCountdownRate((event.target as HTMLInputElement).value)
 })
 $<HTMLInputElement>('bpm').addEventListener('change', event => {
   changeBpm(Number((event.target as HTMLInputElement).value))

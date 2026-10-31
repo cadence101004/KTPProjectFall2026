@@ -5,9 +5,11 @@
 // - Beat map (params.hits is a list): press on each hit, osu-style. For games with discrete hits.
 // - Windows (params.hits is null): finish one task anywhere inside each cycle. For games like scrubbing.
 import type Phaser from 'phaser'
-import type { GameInput, MiniGame, MiniGameParams, Status, TaskMeta } from '../../types/minigame'
+import type { GameInput, HitGrade, MiniGame, MiniGameParams, Status, TaskMeta } from '../../types/minigame'
 import { textStyle } from '../shared/font'
-import { HIT_WINDOW, judgePress } from '../shared/judgePress'
+import { u } from '../shared/units'
+import { HIT_WINDOW, judgePress, tooManyMisses } from '../shared/judgePress'
+import { showJudgement } from '../shared/judgeText'
 
 export class TemplateTaskGame implements MiniGame {
   meta: TaskMeta = {
@@ -24,7 +26,7 @@ export class TemplateTaskGame implements MiniGame {
   private rep = 0 // windows mode: which task the player is on, 0-based
   private repDone = false // windows mode: has the current task been completed?
   private nextHit = 0 // beat map mode: index of the next hit to press
-  private failReason = 'MISSED!'
+  private misses = 0 // beat map mode: hits missed so far; a quarter or more of them fails the game
   private objects: Phaser.GameObjects.GameObject[] = [] // everything added to the scene, for destroy()
   private label!: Phaser.GameObjects.Text
   private target!: Phaser.GameObjects.Arc
@@ -36,9 +38,9 @@ export class TemplateTaskGame implements MiniGame {
   start(params: MiniGameParams): void {
     this.params = params
     const { width, height } = params.scene.scale
-    this.label = params.scene.add.text(width / 2, height * 0.8, '', textStyle(18)).setOrigin(0.5)
-    this.target = params.scene.add.circle(width / 2, height / 2, 20, 0xffcc4d)
-    this.ring = params.scene.add.circle(width / 2, height / 2, 20).setStrokeStyle(3, 0xffffff)
+    this.label = params.scene.add.text(width / 2, height * 0.8, '', textStyle(u(params.scene, 18))).setOrigin(0.5)
+    this.target = params.scene.add.circle(width / 2, height / 2, u(params.scene, 20), 0xffcc4d)
+    this.ring = params.scene.add.circle(width / 2, height / 2, u(params.scene, 20)).setStrokeStyle(u(params.scene, 3), 0xffffff)
     this.objects.push(this.label, this.target, this.ring)
     if (params.hits?.length === 0) this.result = 'won' // an empty beat map has nothing to miss
   }
@@ -59,8 +61,8 @@ export class TemplateTaskGame implements MiniGame {
 
     // Draw the current state. After a win, keep showing it until the clip ends (never end early).
     if (this.result === 'won') this.label.setText('NICE!')
-    else if (this.result === 'failed') this.label.setText(this.failReason)
-    else if (hits) this.label.setText(`Hit ${this.nextHit + 1} / ${hits.length}`)
+    else if (this.result === 'failed') this.label.setText(hits ? 'TOO MANY MISSES!' : 'MISSED!')
+    else if (hits) this.label.setText(`Hit ${this.nextHit + 1} / ${hits.length}   misses ${this.misses}`)
     else this.label.setText(`Task ${this.rep + 1} / ${this.params.reps}${this.repDone ? '  done' : ''}`)
   }
 
@@ -70,14 +72,16 @@ export class TemplateTaskGame implements MiniGame {
     const hits = this.params.hits
     if (hits) {
       // Beat map: judged by the shared rules, so every rhythm game feels the same (see shared/judgePress.ts).
-      const verdict = judgePress(hits, this.nextHit, input.songTime, this.params.startTime)
-      if (verdict === 'hit') {
-        this.nextHit++
+      // A hit is graded PERFECT, GREAT, or GOOD; too early or too late is a MISS for that hit, and play
+      // carries on. showJudgement pops the grade up on screen.
+      const judgement = judgePress(hits, this.nextHit, input.songTime, this.params.startTime)
+      if (judgement.result === 'hit') {
         this.target.setFillStyle(0x7dff7d)
-        if (this.nextHit === hits.length) this.result = 'won'
-      } else if (verdict === 'early' || verdict === 'late') {
-        this.result = 'failed'
-        this.failReason = verdict === 'early' ? 'TOO EARLY!' : 'TOO LATE!'
+        this.judged(judgement.grade!, judgement.offset)
+        this.finishHit(hits, true)
+      } else if (judgement.result === 'early' || judgement.result === 'late') {
+        this.judged('miss', judgement.offset)
+        this.finishHit(hits, false)
       }
     } else if (!this.repDone) {
       // Windows: replace with your game's task. Here, one press completes the current cycle's task.
@@ -95,9 +99,29 @@ export class TemplateTaskGame implements MiniGame {
     this.objects = []
   }
 
-  // Beat map: letting a hit's window close without pressing fails the game.
+  // Beat map: a hit whose window closes without a press is a miss.
   private checkMissedHit(songTime: number, hits: number[]): void {
-    if (this.nextHit < hits.length && songTime > hits[this.nextHit] + HIT_WINDOW) this.result = 'failed'
+    while (this.result === 'running' && this.nextHit < hits.length && songTime > hits[this.nextHit] + HIT_WINDOW) {
+      this.judged('miss', null)
+      this.finishHit(hits, false)
+    }
+  }
+
+  // Beat map: shows a hit's grade (PERFECT, GREAT, GOOD, or MISS) and reports it to the level's score.
+  // Every rhythm game should report each hit like this so the end-of-level rank counts it.
+  private judged(grade: HitGrade, offset: number | null): void {
+    const { width, height } = this.params.scene.scale
+    this.objects.push(showJudgement(this.params.scene, grade, offset, width / 2, height * 0.3))
+    this.params.report(grade)
+  }
+
+  // Beat map: moves on to the next hit after a hit or a miss. A quarter or more of the hits missed fails
+  // the game (the shared MISS_LIMIT); getting through every hit under that wins it.
+  private finishHit(hits: number[], hit: boolean): void {
+    if (!hit) this.misses++
+    this.nextHit++
+    if (tooManyMisses(this.misses, hits.length)) this.result = 'failed'
+    else if (this.nextHit === hits.length) this.result = 'won'
   }
 
   // Windows: each task gets an equal slice of the clip. When a slice closes, its task must be done.

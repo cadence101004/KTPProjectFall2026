@@ -65,7 +65,7 @@ Run locally with `npm install` then `npm run dev`.
 - [x] 3 lives, failure costs one life, music keeps playing
 - [x] Buffer zones show lives and the next prompt
 - [x] 321GO countdown on the beat, plus a control hint flash and a 1 s breather before the game
-- [x] Countdown speed auto-synced to BPM (manual override in the level format; no editor control yet)
+- [x] Countdown speed auto-synced to BPM, with a Countdown speed field in the editor and a warning for buffers too short to fit it
 - [x] Game Over screen with Restart Level and Main Menu
 
 ### 4. Timeline editor
@@ -84,7 +84,7 @@ Run locally with `npm install` then `npm run dev`.
 - [x] Frosted cover effect (blur + dim) per media clip
 - [x] Video playback synced to the audio clock (muted, drift-corrected)
 - [x] Media track in the editor: add, move, cut into pieces, set effects, on/off switch
-- [ ] Drag media edges to resize (use Length or cut + delete for now)
+- [x] Drag media edges to trim them (trimming the start keeps the video in place)
 - [x] Missing or broken media falls back to the default background
 
 ### 6. Level packs (sharing)
@@ -96,7 +96,7 @@ Run locally with `npm install` then `npm run dev`.
 
 ### 7. Polish
 - [ ] Latency calibration
-- [ ] Score and end-of-level rank
+- [x] Score and end-of-level rank (S/A/B/C/D from accuracy)
 - [x] Practice mode (infinite lives), in the editor preview for now
 - [ ] Undo and redo
 - [ ] In-editor minigame preview

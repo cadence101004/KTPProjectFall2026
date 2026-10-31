@@ -1,5 +1,24 @@
 import { describe, expect, it } from 'vitest'
-import { countdownBeats, goLead, planCountdown } from './countdown'
+import type { Clip } from '../types/level'
+import { autoCountdownRate, countdownBeats, countdownNeeds, goLead, planCountdown, shortCountdownBuffers } from './countdown'
+
+describe('shortCountdownBuffers', () => {
+  const game = (start: number, end: number): Clip => ({ type: 'game', gameId: 'x', start, end, difficulty: 1 })
+  const buffer = (start: number, end: number): Clip => ({ type: 'buffer', start, end })
+
+  it('finds a buffer before a minigame that is too short for the countdown', () => {
+    const clips = [buffer(0, 1.5), game(1.5, 5), buffer(5, 8), game(8, 12)]
+    expect(shortCountdownBuffers(clips, 2.6)).toEqual([clips[0]])
+  })
+
+  it('skips buffers that do not lead into a minigame', () => {
+    expect(shortCountdownBuffers([game(0, 4), buffer(4, 5)], 2.6)).toEqual([])
+  })
+
+  it('counts a buffer exactly the needed length as long enough', () => {
+    expect(shortCountdownBuffers([buffer(0, 2.6), game(2.6, 5)], 2.6)).toEqual([])
+  })
+})
 
 // A sound whose counts are 0.5 s apart, with GO at 1.6 s into the file.
 const fileBeats = [0.1, 0.6, 1.1, 1.6]
@@ -37,6 +56,23 @@ describe('planCountdown', () => {
     expect(cue.soundAt).toBe(9)
     expect(cue.fileOffset).toBeCloseTo(0.6)
     expect(cue.beats[3]).toBeCloseTo(10)
+  })
+})
+
+describe('autoCountdownRate', () => {
+  it('puts one count on each beat', () => {
+    expect(autoCountdownRate(fileBeats, 120)).toBeCloseTo(1) // counts 0.5 s apart, beats 0.5 s apart
+    expect(autoCountdownRate(fileBeats, 240)).toBeCloseTo(2)
+  })
+})
+
+describe('countdownNeeds', () => {
+  it('is the sound up to GO plus the breather', () => {
+    expect(countdownNeeds(fileBeats, 120)).toBeCloseTo(1.6 + 1) // GO is 1.6 s in; the breather is 2 beats
+  })
+
+  it('gets shorter with a faster manual rate', () => {
+    expect(countdownNeeds(fileBeats, 120, 2)).toBeCloseTo(0.8 + 1)
   })
 })
 

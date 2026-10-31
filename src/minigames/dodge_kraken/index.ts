@@ -4,6 +4,7 @@
 import type Phaser from 'phaser'
 import type { DurationMeta, GameInput, MiniGame, MiniGameParams, Status } from '../../types/minigame'
 import { textStyle } from '../shared/font'
+import { u } from '../shared/units'
 import { DEATH_FREEZE, deathLift, hopLift, hopProgress } from './motion'
 import { freeSlams, LANES, type Slam, stepLane, syncedSlams } from './slams'
 
@@ -67,7 +68,7 @@ export class DodgeKrakenGame implements MiniGame {
     const laneWidth = width / LANES
     this.objects.push(scene.add.rectangle(width / 2, height / 2, width, height, DECK_COLOR))
     for (let i = 1; i < LANES; i++) {
-      this.objects.push(scene.add.rectangle(laneWidth * i, height / 2, 3, height, LANE_LINE_COLOR))
+      this.objects.push(scene.add.rectangle(laneWidth * i, height / 2, u(scene, 3), height, LANE_LINE_COLOR))
     }
     for (let i = 0; i < LANES; i++) {
       const x = laneWidth * (i + 0.5)

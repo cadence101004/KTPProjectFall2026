@@ -35,16 +35,32 @@ select {
   font-family: inherit;
 }
 
+/* Every page: padding is a buffer at the top and bottom of the screen. Auto margins center a short page
+   vertically, but unlike align-items: center they never push a tall page (the editor) above the top of
+   the window, where it couldn't be scrolled back to. */
 #app {
-  height: 100%;
+  min-height: 100%;
+  box-sizing: border-box;
+  padding: 32px 0;
   display: flex;
-  align-items: center;
   justify-content: center;
 }
 
-canvas {
-  image-rendering: pixelated;
+#app > * {
+  margin-block: auto;
 }
+
+/* The game view in fullscreen (src/ui/fullscreen.ts): fill the screen, with Phaser scaling the game to fit.
+   !important because each page's own .stage size rule (e.g. the editor's 720 px cap) loads later. */
+.stage:fullscreen {
+  width: 100vw !important;
+  height: 100vh !important;
+  aspect-ratio: auto !important;
+  background: #000;
+}
+
+/* No image-rendering on the game canvas: it's drawn in full HD and usually shown smaller, and forcing
+   blocky scaling there made text jagged. Phaser's pixelArt setting keeps sprites crisp inside the canvas. */
 
 /* Debug page (build step 1) */
 .debug {

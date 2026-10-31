@@ -45,7 +45,7 @@ interface DurationMeta { kind: "duration"; minDuration: number; canBeatSync: boo
 interface MiniGame {
   meta: MiniGameMeta;
   preload?(load: Phaser.Loader.LoaderPlugin): void;  // called once at boot
-  start(params: { scene: Phaser.Scene; startTime: number; duration: number; reps: number; bpm: number; beatSync: boolean; hits: number[] | null; difficulty: number }): void;
+  start(params: { scene: Phaser.Scene; startTime: number; duration: number; reps: number; bpm: number; beatSync: boolean; hits: number[] | null; difficulty: number; report: (grade: HitGrade) => void }): void;  // report each hit for the score
   update(songTime: number): void;
   handleInput(input: GameInput): void;  // buttons (left/right/up/down/action) or pointer (x, y in 0..1), stamped with songTime
   status(): "running" | "won" | "failed";
@@ -59,7 +59,8 @@ One beat is `60 / bpm` seconds.
 
 - **Duration games** (survive until the end): `duration = clip.end - clip.start`. Must be at least `minDuration` seconds. Failing at any point loses a life; reaching the clip end is a win. Timing is free unless the game has `canBeatSync` and the clip sets `beatSync: true`; then hazards follow the beat. Not every survival game supports sync.
 - **Task games** (complete N tasks, always on the beat, osu-style): clip length snaps to whole multiples of `baseBeats` beats. `reps = repsFor(meta, clipLength, bpm)` in `src/engine/clipRules.ts`, minimum 1. Each rep gets an equal `duration / reps` window and must be completed within it.
-- **Beat maps** (osu-style): games with discrete hits declare `defaultHits`. Each game clip may store `hits` (beats from the clip start) to override the default, editable per hit in the editor, including offbeats. `hitTimes` in `src/engine/clipRules.ts` turns them into song times for `params.hits`. Task games press on each hit; beat-synced duration games land hazards on each hit; `params.hits` is null for games without `defaultHits` or with beat sync off.
+- **Score and rank** (`src/engine/scoring.ts`): rhythm games call `params.report(grade)` for every hit (Perfect 300, Great 200, Good 100, Miss 0); games without hits are scored by the clip (cleared 300, failed 0). The results screen shows score, accuracy, grade counts, and a rank: S (95%+ and no minigame failed), A 90%, B 80%, C 70%, D below.
+- **Beat maps** (osu-style): games with discrete hits declare `defaultHits`. Each hit is graded Perfect / Great / Good (equal windows early and late, `src/minigames/shared/judgePress.ts`) or Miss; a beat map game fails only once a quarter or more of its hits are missed (`tooManyMisses`). Each game clip may store `hits` (beats from the clip start) to override the default, editable per hit in the editor, including offbeats. `hitTimes` in `src/engine/clipRules.ts` turns them into song times for `params.hits`. Task games press on each hit; beat-synced duration games land hazards on each hit; `params.hits` is null for games without `defaultHits` or with beat sync off.
 - At clip end the engine calls `update(clip.end)` one last time, then reads `status()`, then calls `destroy()`. That last update lets a task game see its final window close.
 
 Templates, rules for minigame authors, and the registry live in `src/minigames/` (see its README.md).
@@ -177,10 +178,18 @@ Build step 3 done inside `LevelScene`: Game Over overlay (Restart Level / Main M
 
 Play page done at `/play.html` (level select, real lives, Restart Level, Main Menu to home), sharing setup with the editor through `src/engine/gameView.ts`. **Known bug:** on the Play page, keyboard input, the page buttons, and the Game Over menu stop responding once a level is running (the game itself plays). Not yet diagnosed; next step is to get the browser console output from Connor. Suspect: the Phaser game is created while its section is still `hidden`.
 
-Build step 5 (media track) mostly done: `src/engine/MediaLayer.ts` draws video/images behind a transparent game canvas, synced to the song clock; the editor has a media lane under the waveform with add, drag, cut (`src/editor/mediaEditing.ts`), per-piece blur/dim, length, and an on/off switch saved as `mediaEnabled`. Media files are stored in IndexedDB (db version 2, `media` store).
+Build step 5 (media track) mostly done: `src/engine/MediaLayer.ts` draws video/images behind a transparent game canvas, synced to the song clock; the editor has a media lane under the waveform with add, drag, edge trimming, and cut (`trimMedia` and `cutMedia` in `src/editor/mediaEditing.ts`), per-piece blur/dim, length, and an on/off switch saved as `mediaEnabled`. Media files are stored in IndexedDB (db version 2, `media` store).
 
 Minigames built: Fire the Cannon (with Cadence's cannon and grass art), Swab the Deck, and Dodge the Kraken (pirate sprites, hop and Mario-style death animations), all owned by Connor; Patch the Hull by Cole. Sprites live in `public/assets/sprites/`.
 
+Game view: Phaser draws at 1920x1080 with `Scale.EXPAND` (`src/engine/gameView.ts`), so text and art are sharp and fullscreen fills any monitor shape. Fixed sizes use design pixels (`u()` in `src/minigames/shared/units.ts`, relative to a 270-tall design); everything else is a fraction of the screen. `LevelScene.layoutHud` repositions the HUD when the screen changes shape.
+
 Site-wide pirate hook cursors (Cadence's art) live in `src/ui/cursor.ts`: images are shrunk on a canvas at load and handed to CSS variables (`--cursor-default`, `-hover`, `-press`, `-drag`, `-wait`) used by `style.css`. Shadow DOM areas (wavesurfer) need their own stylesheet (see `Timeline.useHookCursors`), and the timeline uses a custom scrollbar because native scrollbars always show the system cursor.
 
-Next: build real levels with the four minigames, then come back to the Play page bug.
+Timing: hits are graded with equal early/late windows, and the Timing Calibration page (`/calibrate.html`, `src/calibrate/`) measures the player's audio latency. The saved offset (`src/settings/timing.ts`, localStorage) is subtracted in `AudioClock.songTime` and `MetronomeClock.songTime`, per core rule 1. Grades can show ms offsets in game (a debug toggle on that page).
+
+Scoring (`src/engine/scoring.ts`) with an end-of-level results screen and S-D rank, media edge trimming with grab lips, the countdown speed field, fullscreen (`src/ui/fullscreen.ts`), and the calibration page's beat visualizer are done and tested by Connor.
+
+**Known issue (low priority):** the editor's short-buffer countdown warning never appears for Connor, even though `shortCountdownBuffers` passes its tests. Next step if it matters: compare the "(buffers need X s)" number next to the Countdown field with the actual buffer length.
+
+Next: another minigame (Parry! or Parrot Says), level packs (build step 6), then the Play page bug if it still happens.

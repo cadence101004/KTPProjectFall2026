@@ -2,6 +2,7 @@ import '../style.css'
 import './play.css'
 import { AudioClock } from '../audio/AudioClock'
 import { installPirateCursor, setWaiting } from '../ui/cursor'
+import { fullscreenButton } from '../ui/fullscreen'
 import { hashFile } from '../audio/hash'
 import { createGameView, loadCountdownSound } from '../engine/gameView'
 import { listenForKeys } from '../engine/input'
@@ -33,10 +34,11 @@ app.innerHTML = `
         <b id="levelTitle"></b>
         <label title="Misses are counted instead of costing lives"><input id="practice" type="checkbox" /> Practice</label>
         <button id="start">Start</button>
+        <button id="fullscreen" title="Fill the screen with the game (F). Esc leaves fullscreen.">Fullscreen</button>
         <button id="back">Levels</button>
       </div>
       <div id="stage" class="stage"></div>
-      <p class="help">Arrows or WASD to move, Space or Enter for action, mouse for pointer games. Esc goes back.</p>
+      <p class="help">Arrows or WASD to move, Space or Enter for action, mouse for pointer games. F toggles fullscreen. Esc goes back (or leaves fullscreen).</p>
     </section>
   </div>`
 
@@ -161,6 +163,7 @@ function backToLevels(): void {
 
 $('start').addEventListener('click', () => void start())
 $('back').addEventListener('click', backToLevels)
+fullscreenButton($<HTMLButtonElement>('fullscreen'), $('stage'))
 $<HTMLInputElement>('practice').addEventListener('change', event => {
   levelScene.setPractice((event.target as HTMLInputElement).checked)
 })

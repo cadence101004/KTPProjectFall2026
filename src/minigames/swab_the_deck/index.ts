@@ -5,6 +5,7 @@
 import type Phaser from 'phaser'
 import type { GameInput, MiniGame, MiniGameParams, Status, TaskMeta } from '../../types/minigame'
 import { textStyle } from '../shared/font'
+import { u } from '../shared/units'
 import { grimeFor, type GrimeSettings, MOP_REACH, pickGrimeSpots, type Point, rubAmount } from './grime'
 
 // The most spots one cycle can have (difficulty 3). start() makes this many circles once and reuses them.
@@ -69,7 +70,7 @@ export class SwabTheDeckGame implements MiniGame {
       this.spots.push({ at: { x: 0, y: 0 }, dirt: 0, circle })
     }
 
-    this.mop = scene.add.circle(width / 2, height / 2, this.grime.radius * height * MOP_REACH).setStrokeStyle(3, MOP_COLOR)
+    this.mop = scene.add.circle(width / 2, height / 2, this.grime.radius * height * MOP_REACH).setStrokeStyle(u(scene, 3), MOP_COLOR)
     this.label = scene.add.text(width / 2, height * 0.14, '', textStyle(Math.round(height * 0.07))).setOrigin(0.5)
     this.objects.push(this.mop, this.label)
   }

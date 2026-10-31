@@ -1,13 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { HIT_WINDOW } from '../shared/judgePress'
-import { fuseBurn, hitWindowFor } from './fuse'
+import { fuseBurn, windowScaleFor } from './fuse'
 
-describe('hitWindowFor', () => {
-  it('narrows the window as difficulty rises', () => {
-    expect(hitWindowFor(1)).toBe(HIT_WINDOW)
-    expect(hitWindowFor(2)).toBeCloseTo(HIT_WINDOW * 0.8)
-    expect(hitWindowFor(3)).toBeCloseTo(HIT_WINDOW * 0.65)
-    expect(hitWindowFor(5)).toBeCloseTo(HIT_WINDOW * 0.65)
+describe('windowScaleFor', () => {
+  it('narrows the judgement windows as difficulty rises', () => {
+    expect(windowScaleFor(1)).toBe(1)
+    expect(windowScaleFor(2)).toBe(0.8)
+    expect(windowScaleFor(3)).toBe(0.65)
+    expect(windowScaleFor(5)).toBe(0.65)
   })
 })
 
