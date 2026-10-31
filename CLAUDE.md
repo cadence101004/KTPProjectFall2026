@@ -45,7 +45,7 @@ interface DurationMeta { kind: "duration"; minDuration: number; canBeatSync: boo
 interface MiniGame {
   meta: MiniGameMeta;
   preload?(load: Phaser.Loader.LoaderPlugin): void;  // called once at boot
-  start(params: { scene: Phaser.Scene; startTime: number; duration: number; reps: number; bpm: number; beatSync: boolean; hits: number[] | null; difficulty: number; report: (grade: HitGrade) => void }): void;  // report each hit for the score
+  start(params: { scene: Phaser.Scene; startTime: number; duration: number; reps: number; bpm: number; beatSync: boolean; hits: number[] | null; difficulty: number; background: boolean; report: (grade: HitGrade) => void }): void;  // background: draw the sky/walls layer; report each hit for the score
   update(songTime: number): void;
   handleInput(input: GameInput): void;  // buttons (left/right/up/down/action) or pointer (x, y in 0..1), stamped with songTime
   status(): "running" | "won" | "failed";
@@ -59,6 +59,7 @@ One beat is `60 / bpm` seconds.
 
 - **Duration games** (survive until the end): `duration = clip.end - clip.start`. Must be at least `minDuration` seconds. Failing at any point loses a life; reaching the clip end is a win. Timing is free unless the game has `canBeatSync` and the clip sets `beatSync: true`; then hazards follow the beat. Not every survival game supports sync.
 - **Task games** (complete N tasks, always on the beat, osu-style): clip length snaps to whole multiples of `baseBeats` beats. `reps = repsFor(meta, clipLength, bpm)` in `src/engine/clipRules.ts`, minimum 1. Each rep gets an equal `duration / reps` window and must be completed within it.
+- **Two layers:** every minigame draws a background (sky, walls) and a foreground (floor, characters, props). Games whose background is scenery opt in with `canHideBackground: true` in meta and skip it when `params.background` is false; the editor's "Minigame background" checkbox (shown only for those games) sets the clip's `hideBackground` so the level's media track shows through. Games whose background is the playfield (Kraken, Swab, Patch the Hull) always draw it.
 - **Score and rank** (`src/engine/scoring.ts`): rhythm games call `params.report(grade)` for every hit (Perfect 300, Great 200, Good 100, Miss 0); games without hits are scored by the clip (cleared 300, failed 0). The results screen shows score, accuracy, grade counts, and a rank: S (95%+ and no minigame failed), A 90%, B 80%, C 70%, D below.
 - **Beat maps** (osu-style): games with discrete hits declare `defaultHits`. Each hit is graded Perfect / Great / Good (equal windows early and late, `src/minigames/shared/judgePress.ts`) or Miss; a beat map game fails only once a quarter or more of its hits are missed (`tooManyMisses`). Each game clip may store `hits` (beats from the clip start) to override the default, editable per hit in the editor, including offbeats. `hitTimes` in `src/engine/clipRules.ts` turns them into song times for `params.hits`. Task games press on each hit; beat-synced duration games land hazards on each hit; `params.hits` is null for games without `defaultHits` or with beat sync off.
 - At clip end the engine calls `update(clip.end)` one last time, then reads `status()`, then calls `destroy()`. That last update lets a task game see its final window close.

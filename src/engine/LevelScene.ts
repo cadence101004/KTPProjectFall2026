@@ -202,6 +202,7 @@ export class LevelScene extends Phaser.Scene {
       beatSync: meta.kind === 'task' || (!!clip.beatSync && meta.canBeatSync),
       hits,
       difficulty: clip.difficulty,
+      background: !(clip.hideBackground && meta.canHideBackground), // only games that allow it can hide it
       report: (grade: HitGrade) => {
         if (this.current !== current) return // a stray report after the clip ended
         current.reported++

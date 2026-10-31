@@ -16,6 +16,7 @@ export interface GameClip {
   difficulty: number
   beatSync?: boolean // duration games that support it: time hazards to the beat. Ignored by task games
   hits?: number[] // the clip's beat map, in beats from the clip's start. Absent means the game's default pattern
+  hideBackground?: boolean // skip the minigame's background layer so the level's media track shows through
 }
 
 // Game track entries. Never overlap each other.

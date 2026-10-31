@@ -35,6 +35,7 @@ export class FireCannonGame implements MiniGame {
     kind: 'task',
     prompt: 'FIRE!',
     hint: 'SPACE',
+    canHideBackground: true, // a sky over the ground: hide it to put a level video behind the game
     baseBeats: 2,
     defaultHits: [1], // fire on the 2nd beat of each 2-beat cycle
   }
@@ -83,7 +84,9 @@ export class FireCannonGame implements MiniGame {
     // Tiles are scaled up from their 32 px art by the same amount as the rest of the game (design pixels).
     const groundTop = Math.round(height * 0.7)
     const tileSize = u(scene, TILE)
-    add(scene.add.rectangle(width / 2, groundTop / 2, width, groundTop, SKY_COLOR))
+    // Background layer (the sky), skipped when the level turns it off so its video shows through. Everything
+    // after it, from the grass on, is the foreground.
+    if (params.background) add(scene.add.rectangle(width / 2, groundTop / 2, width, groundTop, SKY_COLOR))
     for (let y = groundTop; y < height; y += tileSize) {
       for (let x = 0; x < width; x += tileSize) {
         const tile = GRASS[Math.floor(Math.random() * GRASS.length)]

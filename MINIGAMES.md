@@ -13,6 +13,7 @@ Every minigame we plan to build. Claim one by putting your name in **Owner**, th
 | [ ] | Fire the Cannon | `fire_cannon` | task | always | 1 | Connor |
 | [ ] | Swab the Deck | `swab_the_deck` | task | always | 1 | Connor |
 | [ ] | Dodge the Kraken | `dodge_kraken` | duration | optional | 1 | Connor |
+| [ ] | Catch the Fruit | `catch_the_fruit` | duration | optional | 2 | Connor |
 | [ ] | Patch the Hull | `patch_the_hull` | task | always | 2 | Cole |
 | [ ] | Parrot Says | `parrot_says` | task | always | 2 | |
 | [ ] | Parry! | `parry` | task | always | 2 | |
@@ -86,6 +87,15 @@ Priority 1 games cover every case the engine has to handle, so build those first
 ---
 
 ## Duration games
+
+### Catch the Fruit (`catch_the_fruit`)
+- **Prompt / hint:** `CATCH!` / `← →`
+- **minDuration:** 4 s. **Beat sync:** optional. **Default hits:** `[0, 2]` (fruit lands on beats 1 and 3 of each bar)
+- **Mechanic:** Fruit falls onto a beach, and the pirate walks left and right (hold the arrows) to catch each one in her bucket. Every fruit spawns within walking reach of the last, so all of it is catchable.
+- **Beat sync on:** every fruit lands in the bucket on a beat map hit. **Off:** fruit falls at its own pace.
+- **Graded per catch:** dead center is Perfect, then Great and Good toward the rim; a dropped fruit is a Miss. **Fail:** a quarter or more of the fruit dropped. **Win:** reaching the clip end.
+- **Difficulty:** a smaller bucket, and (beat sync off) fruit closer together.
+- **Art:** Cadence's `bucket_character` (front and two walking frames) and `fruits`, on `floortiles/sand.png`.
 
 ### Dodge the Kraken (`dodge_kraken`)
 - **Prompt / hint:** `DODGE!` / `â† â†’`

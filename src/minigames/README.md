@@ -51,8 +51,9 @@ One beat lasts `60 / params.bpm` seconds. Use it to put cues and animations on t
 4. **Clean up.** Add every game object you create to `this.objects` so `destroy()` removes it. Anything left behind will show up in the next minigame.
 5. **Text uses the game font (Pixelify Sans).** Phaser draws text onto a canvas where page CSS doesn't reach, so create text with `textStyle` from `src/minigames/shared/font.ts`: `scene.add.text(x, y, 'FIRE!', textStyle(24, { color: '#ffcc4d' }))`.
 6. **Size things relative to the screen.** The game is drawn in full HD and the screen can be any shape (it fills the monitor in fullscreen), so never use fixed positions. Use fractions of `params.scene.scale.width` and `height`, and for fixed sizes like a line's thickness or a font size use design pixels: `u(scene, 3)` from `src/minigames/shared/units.ts` means 3 pixels at the original 480x270 design size.
-6. **Use the abstract buttons.** Listen for `'left'`, `'right'`, `'up'`, `'down'`, `'action'`, or pointer input (`x`, `y` from 0 to 1). Never read the keyboard directly, so touch and gamepad work for free.
-7. **Never import from another minigame or from `src/engine/`.** Import types from `src/types/minigame.ts` and shared helpers from `src/minigames/shared/` only.
+7. **Draw two layers: a background and a foreground.** The **background** is the sky, walls, or anything that just fills the scene; draw it first. The **foreground** is the floor, characters, props, and anything you play with. If your background is scenery a video could replace (a sky over a floor), set `canHideBackground: true` in `meta` and draw the background only `if (params.background)`: level designers then get a "Minigame background" checkbox to show a video behind your floor and characters. If your background is the playfield itself (a deck, a hull wall), leave `canHideBackground` out and always draw it. Fire the Cannon and Catch the Fruit opt in; Dodge the Kraken, Swab the Deck, and Patch the Hull don't.
+8. **Use the abstract buttons.** Listen for `'left'`, `'right'`, `'up'`, `'down'`, `'action'`, or pointer input (`x`, `y` from 0 to 1). Never read the keyboard directly, so touch and gamepad work for free.
+9. **Never import from another minigame or from `src/engine/`.** Import types from `src/types/minigame.ts` and shared helpers from `src/minigames/shared/` only.
 
 ## 5. Art and sound
 

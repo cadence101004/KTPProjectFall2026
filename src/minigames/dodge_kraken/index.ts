@@ -5,7 +5,8 @@ import type Phaser from 'phaser'
 import type { DurationMeta, GameInput, MiniGame, MiniGameParams, Status } from '../../types/minigame'
 import { textStyle } from '../shared/font'
 import { u } from '../shared/units'
-import { DEATH_FREEZE, deathLift, hopLift, hopProgress } from './motion'
+import { DEATH_FREEZE, deathLift } from '../shared/deathFall'
+import { hopLift, hopProgress } from './motion'
 import { freeSlams, LANES, type Slam, stepLane, syncedSlams } from './slams'
 
 // Texture keys, prefixed with the game ID so they never clash with another game's.
@@ -66,6 +67,8 @@ export class DodgeKrakenGame implements MiniGame {
     const { scene } = params
     const { width, height } = scene.scale
     const laneWidth = width / LANES
+    // Background layer: the deck. It's the playfield, so it's always drawn (no canHideBackground in meta).
+    // The lane lines, shadows, tentacles, and pirate are the foreground.
     this.objects.push(scene.add.rectangle(width / 2, height / 2, width, height, DECK_COLOR))
     for (let i = 1; i < LANES; i++) {
       this.objects.push(scene.add.rectangle(laneWidth * i, height / 2, u(scene, 3), height, LANE_LINE_COLOR))

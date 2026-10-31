@@ -20,6 +20,10 @@ interface BaseMeta {
   id: string // matches GameClip.gameId and the folder name, e.g. 'fire_cannon'
   prompt: string // command flashed at start, e.g. 'FIRE!'
   hint: string // control hint flashed with the countdown, e.g. 'SPACE'
+  // True if this game's background (e.g. a sky over a floor) can be hidden so a level video shows through,
+  // which turns on the editor's "Minigame background" checkbox. Leave it out for games whose background is
+  // the playfield itself (a deck, a hull wall); those always draw it.
+  canHideBackground?: boolean
 }
 
 // Task games: one task per cycle of baseBeats, always on the song's beat.
@@ -55,6 +59,10 @@ export interface MiniGameParams {
   // (beat-synced duration games). Null if the game has no defaultHits, or beat sync is off.
   hits: number[] | null
   difficulty: number
+  // Whether to draw the background layer (e.g. the sky). Only ever false for games with canHideBackground,
+  // when the level designer turned it off for this clip so the level's media track shows through. Always
+  // draw the foreground (floors, characters, props), and draw the background first so it stays behind.
+  background: boolean
   // Call once for each hit the player makes or misses, so it counts toward the level's score and rank.
   // Games without discrete hits don't need it: the engine scores their clip by whether it was won.
   report: (grade: HitGrade) => void

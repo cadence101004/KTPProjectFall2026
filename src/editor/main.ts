@@ -448,6 +448,22 @@ function renderClipOptions(clip: Clip | undefined): void {
   const meta = metaFor(clip.gameId)
   if (!meta) return
 
+  // For games that allow it (canHideBackground), untick to skip the minigame's background (its sky) so the
+  // level's video shows through behind its floor and characters. Other games always keep their background.
+  if (meta.canHideBackground) {
+    const background = document.createElement('label')
+    background.title = 'Untick to let the media track (e.g. a video) show behind this minigame'
+    const showBackground = Object.assign(document.createElement('input'), { type: 'checkbox', checked: !clip.hideBackground })
+    showBackground.addEventListener('change', () => {
+      endPreview()
+      if (showBackground.checked) delete clip.hideBackground
+      else clip.hideBackground = true
+      render()
+    })
+    background.append(showBackground, ' Minigame background')
+    panel.append(background)
+  }
+
   if (meta.kind === 'duration' && meta.canBeatSync) {
     const toggle = document.createElement('label')
     const box = Object.assign(document.createElement('input'), { type: 'checkbox', checked: !!clip.beatSync })

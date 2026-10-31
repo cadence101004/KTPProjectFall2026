@@ -15,6 +15,7 @@ export interface SandboxRun {
   length: number // requested clip length in seconds; task games snap it to whole cycles
   difficulty: number
   beatSync: boolean
+  background: boolean // draw the minigame's background layer
 }
 
 // Plays one minigame as if it were a clip in a level: a one-bar count-in, the clip, then the result.
@@ -81,6 +82,7 @@ export class SandboxScene extends Phaser.Scene {
       hits: hitTimes(meta, clip, run.bpm),
       report: () => {}, // the sandbox plays one game on its own, with no level score to count toward
       difficulty: run.difficulty,
+      background: run.background || !meta.canHideBackground, // games that don't allow hiding always draw it
     }
     this.endTime = startTime + duration
     this.started = false

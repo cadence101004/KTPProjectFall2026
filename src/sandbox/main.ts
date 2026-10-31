@@ -18,6 +18,7 @@ app.innerHTML = `
       <label>Length (s) <input id="length" type="number" min="1" max="60" step="0.5" value="8" /></label>
       <label>Difficulty <input id="difficulty" type="number" min="1" max="5" value="1" /></label>
       <label><input id="beatSync" type="checkbox" /> Beat sync</label>
+      <label title="Untick to see the game's foreground alone, as over a level video"><input id="background" type="checkbox" checked /> Background</label>
       <button id="start">Start</button>
     </div>
     <div id="stage" class="stage"></div>
@@ -41,6 +42,7 @@ $('start').addEventListener('click', () => {
     length: Number($<HTMLInputElement>('length').value) || 8,
     difficulty: Number($<HTMLInputElement>('difficulty').value) || 1,
     beatSync: $<HTMLInputElement>('beatSync').checked,
+    background: $<HTMLInputElement>('background').checked,
   })
 })
 

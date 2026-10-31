@@ -58,6 +58,8 @@ export class SwabTheDeckGame implements MiniGame {
     const { scene } = params
     const { width, height } = scene.scale
 
+    // Background layer: the deck planks. They're the playfield, so they're always drawn (no
+    // canHideBackground in meta). The grime and the mop are the foreground.
     this.objects.push(scene.add.rectangle(width / 2, height / 2, width, height, DECK_COLOR))
     for (let i = 1; i < PLANK_COUNT; i++) {
       const y = (height * i) / PLANK_COUNT
