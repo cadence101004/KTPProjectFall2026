@@ -128,19 +128,22 @@ Levels are shared as a single `.pwlevel` file, which is a zip. Loading one must 
 
 ```
 my_level.pwlevel
-  manifest.json          # { "format": 1, "title": "...", "hasAudio": true }
+  manifest.json          # { "format": 1, "title": "...", "hasAudio": true, "names": { "<path>": "original name" } }
   level.json             # the level file format above
-  audio/song.mp3         # optional; if missing, prompt for the MP3 and check audioHash
-  media/*                # optional images and videos; if missing, prompt for them and check mediaHash
-  minigames/<id>/
+  audio/song.<ext>       # optional ("Include song"); if missing, prompt for the MP3 and check audioHash
+  media/<hash>.<ext>     # images and videos, named by their SHA-256
+  sfx/<hash>.<ext>       # sound effects, named by their SHA-256
+  minigames/<id>/        # NOT BUILT YET (stretch goal): custom minigames from templates
     minigame.json        # { "id", "template": "fire_cannon", "prompt", "baseDuration", "config": {...} }
     sprites/*.png        # optional art overrides for the template
 ```
 
+Built: `src/packs/pack.ts` (buildPack and readPack, pure and tested) and `src/packs/packFiles.ts` (export as a download, import into IndexedDB). The editor exports and imports (button or drop); the Play page imports (button or drop). Import checks the format version, every file's hash, overlapping clips, unknown game IDs (a warning), and file sizes before unpacking.
+
 - **Custom minigames are data, never code.** A pack's minigame picks a built-in template and supplies config and sprites. Never `eval` or import JS from a pack.
 - Validate everything on import: manifest `format` version, clip overlaps, known template IDs, and sane file sizes.
 - `audioHash` is always computed and stored, even when the MP3 is embedded, so packs without audio still verify.
-- Zip library: `fflate` (small, no dependencies). Ask before installing.
+- Zip library: `fflate` (installed).
 
 ## Planned minigames
 
@@ -204,4 +207,6 @@ Minigames built since: Parry!, Parrot Says, X Marks the Spot, Cannonball Barrage
 
 Cadence's painted backgrounds (island, ship deck, ocean) are shared through `src/minigames/shared/backdrop.ts` (`loadBackdrop`, `addBackdrop`, cover-scaled). Games whose backdrop already has a floor draw their plain floor only when the background is hidden. The SFX track (editor lane, Play, and preview) is done.
 
-Next: a polished local game with the built-in minigames and assets (real levels, Play page, polish). Level packs (build step 6) are a stretch goal for later. Fix the Play page bug if it still happens.
+Level packs (build step 6) are done, except custom minigames inside packs.
+
+Next: a polished local game with the built-in minigames and assets (real levels, Play page, polish). Fix the Play page bug if it still happens.

@@ -11,6 +11,7 @@ import { MediaLayer } from '../engine/MediaLayer'
 import { listLevels, type LevelRecord, loadSong, saveSong } from '../storage/db'
 import { loadMediaFiles, type MediaFile, mediaUrls } from '../storage/mediaFiles'
 import { loadSoundBuffers } from '../storage/soundFiles'
+import { importPack, isPackFile } from '../packs/packFiles'
 import type { Level } from '../types/level'
 
 // Play page: pick a saved level, then play it with real lives. Esc or Levels returns to the list.
@@ -27,6 +28,11 @@ app.innerHTML = `
       <div id="needSong" class="need-song" hidden>
         <p id="needSongText"></p>
         <input type="file" id="songFile" accept="audio/*,video/mp4" />
+      </div>
+      <div id="importZone" class="import-zone">
+        <p>Got a level pack from a friend? Drop the <b>.pwlevel</b> file here, or
+          <label class="pick">pick it<input type="file" id="packFile" accept=".pwlevel,.zip" hidden /></label>.</p>
+        <p id="importStatus" class="import-status"></p>
       </div>
     </section>
 
@@ -147,6 +153,23 @@ async function start(): Promise<void> {
   levelScene.startAt(level, 0)
 }
 
+// Imports a shared .pwlevel: stores its level, song, media, and sounds in this browser, then shows it at the
+// top of the level list. If it came without its song, picking it asks for the MP3 as usual.
+async function importLevelPack(file: File): Promise<void> {
+  const status = $('importStatus')
+  status.textContent = `Opening ${file.name}...`
+  setWaiting(true)
+  try {
+    const { level: imported, warnings } = await importPack(file)
+    await showLevelList()
+    status.textContent = [`Added "${imported.title}" to the top of the list.`, ...warnings].join(' ')
+  } catch (error) {
+    status.textContent = error instanceof Error ? error.message : `Could not open ${file.name}.`
+  } finally {
+    setWaiting(false)
+  }
+}
+
 // Stops the game and returns to the level list.
 function backToLevels(): void {
   clock.stop()
@@ -168,6 +191,26 @@ $('back').addEventListener('click', backToLevels)
 fullscreenButton($<HTMLButtonElement>('fullscreen'), $('stage'))
 $<HTMLInputElement>('practice').addEventListener('change', event => {
   levelScene.setPractice((event.target as HTMLInputElement).checked)
+})
+$<HTMLInputElement>('packFile').addEventListener('change', event => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = '' // so picking the same file again still fires
+  if (file) void importLevelPack(file)
+})
+// Dropping a .pwlevel anywhere on the level list imports it.
+window.addEventListener('dragover', event => {
+  event.preventDefault()
+  $('importZone').classList.toggle('over', !$('select').hidden)
+})
+window.addEventListener('dragleave', () => $('importZone').classList.remove('over'))
+window.addEventListener('drop', event => {
+  event.preventDefault()
+  $('importZone').classList.remove('over')
+  const file = event.dataTransfer?.files[0]
+  if (!file || $('select').hidden) return
+  if (isPackFile(file)) void importLevelPack(file)
+  else $('importStatus').textContent = `${file.name} isn't a level pack (.pwlevel).`
 })
 $<HTMLInputElement>('songFile').addEventListener('change', event => {
   const file = (event.target as HTMLInputElement).files?.[0]

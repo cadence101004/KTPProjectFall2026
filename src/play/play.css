@@ -112,3 +112,31 @@
 .play [hidden] {
   display: none;
 }
+
+/* The level pack drop zone under the level list. It lights up while a file is dragged over the page. */
+.play .import-zone {
+  padding: 14px 18px;
+  border: 2px dashed rgba(255, 204, 77, 0.45);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.play .import-zone.over {
+  border-color: #ffcc4d;
+  background: rgba(255, 204, 77, 0.12);
+}
+
+.play .import-zone p {
+  margin: 0;
+}
+
+.play .import-zone .pick {
+  color: #ffcc4d;
+  text-decoration: underline;
+  cursor: var(--cursor-hover, pointer);
+}
+
+.play .import-status:not(:empty) {
+  margin-top: 8px;
+  opacity: 0.85;
+}

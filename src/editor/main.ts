@@ -20,6 +20,7 @@ import { freeGaps, placeMove, placeResize, snapLength } from './clipEditing'
 import { cutMedia, trimMedia } from './mediaEditing'
 import { computePeaks } from './peaks'
 import { previewStart } from './preview'
+import { exportPack, importPack, isPackFile } from '../packs/packFiles'
 import { type ClipView, Timeline } from './Timeline'
 
 // Timeline editor (build step 4). 4a: waveform, play, scrub. 4b: clips. 4c: beat grid. 4d: save and load.
@@ -35,6 +36,10 @@ app.innerHTML = `
       <select id="levels"><option value="">Saved levels...</option></select>
       <button id="load">Load</button>
       <button id="new">New level</button>
+      <button id="exportPack" disabled title="Save this level, its media, and its sounds as one .pwlevel file to share">Export pack</button>
+      <label title="Put the song in the pack. Untick to make the player bring their own copy of the MP3.">
+        <input id="packSong" type="checkbox" checked /> Include song</label>
+      <label class="file-button" title="Open a .pwlevel someone shared (or drop it anywhere on this page)">Import pack<input id="importPack" type="file" accept=".pwlevel,.zip" /></label>
     </div>
     <div class="controls">
       <input type="file" id="song" accept="audio/*,video/mp4" />
@@ -772,6 +777,7 @@ async function openSong(file: Blob, name: string): Promise<void> {
   $<HTMLButtonElement>('preview').disabled = false
   $<HTMLButtonElement>('setOffset').disabled = false
   $<HTMLButtonElement>('save').disabled = false
+  $<HTMLButtonElement>('exportPack').disabled = false
   drawGrid()
   render()
 }
@@ -836,6 +842,41 @@ async function save(): Promise<void> {
   await saveLevel(levelId, level)
   await refreshLevelList(levelId)
   setStatus(`Saved "${level.title}".`)
+}
+
+// Downloads the level as a .pwlevel pack: the level as it is now (saved or not), its media and sounds, and
+// the song too unless "Include song" is unticked.
+async function exportLevelPack(): Promise<void> {
+  if (!song) {
+    setStatus('Load a song before exporting.')
+    return
+  }
+  level.title = $<HTMLInputElement>('title').value.trim() || 'Untitled level'
+  setWaiting(true)
+  try {
+    const { missing } = await exportPack(level, $<HTMLInputElement>('packSong').checked ? song : null, mediaFiles, sounds)
+    const note = missing ? ` ${missing} media or sound file(s) weren't in this browser, so they were left out.` : ''
+    setStatus(`Exported "${level.title}".${note}`)
+  } finally {
+    setWaiting(false)
+  }
+}
+
+// Imports a .pwlevel: stores everything in it, adds the level to the saved list, and opens it (asking for
+// the MP3 if the pack came without one and it isn't already stored).
+async function importLevelPack(file: File): Promise<void> {
+  endPreview()
+  setWaiting(true)
+  try {
+    const { id, level: imported, warnings } = await importPack(file)
+    await refreshLevelList(id)
+    await open(id)
+    if (warnings.length) setStatus(`Imported "${imported.title}". ${warnings.join(' ')}`)
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : `Could not import ${file.name}.`)
+  } finally {
+    setWaiting(false)
+  }
 }
 
 // Opens a saved level. If its song is stored too it opens straight away; otherwise it asks for the MP3.
@@ -961,6 +1002,20 @@ for (const button of app.querySelectorAll<HTMLButtonElement>('[data-add]')) {
   button.addEventListener('click', () => addClip(button.dataset.add ?? ''))
 }
 $('delete').addEventListener('click', deleteSelected)
+$('exportPack').addEventListener('click', () => void exportLevelPack())
+$<HTMLInputElement>('importPack').addEventListener('change', event => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = '' // so picking the same file again still fires
+  if (file) void importLevelPack(file)
+})
+// Dropping a .pwlevel anywhere on the page imports it.
+window.addEventListener('dragover', event => event.preventDefault())
+window.addEventListener('drop', event => {
+  event.preventDefault()
+  const file = event.dataTransfer?.files[0]
+  if (file && isPackFile(file)) void importLevelPack(file)
+})
 
 window.addEventListener('keydown', event => {
   if ((event.ctrlKey || event.metaKey) && event.code === 'KeyS') {
