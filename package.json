@@ -11,13 +11,16 @@
   },
   "devDependencies": {
     "typescript": "~6.0.3",
-    "vite": "^8.3.4",
-    "vitest": "^4.1.12"
+    "vite": "^6.2.7",
+    "vitest": "^3.1.4"
   },
   "dependencies": {
     "fflate": "^0.8.3",
     "idb": "^8.0.4",
     "phaser": "^4.2.1",
     "wavesurfer.js": "^8.0.3"
+  },
+  "allowScripts": {
+    "esbuild@0.25.12": true
   }
 }
