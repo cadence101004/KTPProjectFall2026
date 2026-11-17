@@ -1,9 +1,10 @@
 // Cannonball Barrage: an enemy cannon fires cannonballs across the deck, high or low. Jump (up) over the low
 // ones and duck (hold down) under the high ones. With beat sync on, every ball reaches the pirate on a beat
 // map hit. A dodge is a Perfect, a hit a Miss; a quarter or more hit knocks her out. Spec in MINIGAMES.md.
-// Art by Cadence (the pirate, her jump frames, and the cannon, mirrored to face her).
+// Art by Cadence (the pirate, her jump and crouch frames, the cannon mirrored to face her, and the ocean).
 import type Phaser from 'phaser'
 import type { DurationMeta, GameInput, MiniGame, MiniGameParams, Status } from '../../types/minigame'
+import { addBackdrop, loadBackdrop } from '../shared/backdrop'
 import { DEATH_FREEZE, deathLift } from '../shared/deathFall'
 import { textStyle } from '../shared/font'
 import { tooManyMisses } from '../shared/judgePress'
@@ -16,12 +17,11 @@ const STAND = 'cannonball_barrage_stand'
 const RISE = 'cannonball_barrage_rise' // first half of a jump
 const FALL = 'cannonball_barrage_fall' // second half
 const DEATH_JUMP = 'cannonball_barrage_death_jump'
+const CROUCH = 'cannonball_barrage_crouch'
 const CANNON = 'cannonball_barrage_cannon'
 const CANNON_FIRING = 'cannonball_barrage_cannon_firing'
 const BALL = 'cannonball_barrage_ball'
 
-const SKY_COLOR = 0x8fd3f4
-const SEA_COLOR = 0x2f7fb8
 const DECK_COLOR = 0x7a4d24
 const SEAM_COLOR = 0x4a2e14
 const FIRE_SHOW = 0.2 // seconds the enemy cannon shows its firing frame after each shot
@@ -41,7 +41,7 @@ export class CannonballBarrageGame implements MiniGame {
     kind: 'duration',
     prompt: 'DODGE!',
     hint: '↑ JUMP  ↓ DUCK',
-    canHideBackground: true, // a sky and sea behind the deck: hide them to put a level video behind the fight
+    canHideBackground: true, // the ocean behind the deck: hide it to put a level video behind the fight
     minDuration: 4,
     canBeatSync: true,
     defaultHits: [0, 2], // beat sync on: a ball reaches her on beats 1 and 3 of each bar
@@ -62,6 +62,7 @@ export class CannonballBarrageGame implements MiniGame {
   private pirateX = 0
   private feetY = 0
   private pirateScale = 1
+  private crouchScale = 1 // the crouch art is drawn bigger, so it's scaled to match her width
   private muzzle = { x: 0, y: 0 } // where balls leave the enemy cannon
   private ballY: Record<BallHeight, number> = { high: 0, low: 0 } // where each kind of ball crosses the pirate
 
@@ -73,9 +74,11 @@ export class CannonballBarrageGame implements MiniGame {
     load.image(CANNON, '/assets/sprites/cannons/cannon.png')
     load.image(CANNON_FIRING, '/assets/sprites/cannons/cannonshooting.png')
     load.image(BALL, '/assets/sprites/cannons/cannonball.png')
+    load.image(CROUCH, '/assets/sprites/crouching_character/Crouch2.png')
+    loadBackdrop(load, 'ocean')
   }
 
-  // Plans every ball up front, then builds the sky and sea, the deck, the enemy cannon, the pirate, and balls.
+  // Plans every ball up front, then builds the ocean, the deck, the enemy cannon, the pirate, and balls.
   start(params: MiniGameParams): void {
     this.params = params
     const times = arrivalTimes(params.hits, params.startTime, params.duration, params.difficulty, Math.random)
@@ -88,12 +91,9 @@ export class CannonballBarrageGame implements MiniGame {
       return object
     }
 
-    // Background layer (sky and sea), skipped when the level turns it off. The deck onward is the foreground.
+    // Background layer (Cadence's ocean), skipped when the level turns it off. The deck onward is the foreground.
     const deckTop = Math.round(height * 0.78)
-    if (params.background) {
-      add(scene.add.rectangle(width / 2, deckTop / 2, width, deckTop, SKY_COLOR))
-      add(scene.add.rectangle(width / 2, deckTop - height * 0.08, width, height * 0.16, SEA_COLOR))
-    }
+    if (params.background) add(addBackdrop(scene, 'ocean'))
     add(scene.add.rectangle(width / 2, (deckTop + height) / 2, width, height - deckTop, DECK_COLOR))
     add(scene.add.rectangle(width / 2, deckTop + (height - deckTop) / 2, width, u(scene, 1.5), SEAM_COLOR))
 
@@ -108,6 +108,7 @@ export class CannonballBarrageGame implements MiniGame {
     this.pirate = add(scene.add.image(this.pirateX, this.feetY, STAND).setOrigin(0.5, 1))
     this.pirateScale = (height * 0.3) / this.pirate.height
     this.pirate.setScale(this.pirateScale)
+    this.crouchScale = (this.pirate.displayWidth * 1.15) / scene.textures.get(CROUCH).getSourceImage().width
     const pirateHeight = this.pirate.displayHeight
     this.ballY = { high: this.feetY - pirateHeight * 0.78, low: this.feetY - pirateHeight * 0.15 }
 
@@ -190,8 +191,8 @@ export class CannonballBarrageGame implements MiniGame {
       const sinceJump = songTime - this.jumpedAt
       const lift = jumpLift(sinceJump)
       const crouched = this.ducking && lift === 0
-      this.pirate.setTexture(lift > 0 ? (sinceJump < JUMP_TIME / 2 ? RISE : FALL) : STAND)
-      this.pirate.setScale(this.pirateScale * (crouched ? 1.12 : 1), this.pirateScale * (crouched ? 0.6 : 1)) // a squash, until there's crouch art
+      this.pirate.setTexture(lift > 0 ? (sinceJump < JUMP_TIME / 2 ? RISE : FALL) : crouched ? CROUCH : STAND)
+      this.pirate.setScale(crouched ? this.crouchScale : this.pirateScale)
       this.pirate.setY(this.feetY - lift * height)
       this.pirate.setTint(songTime - this.hitAt < FLINCH_TIME ? 0xff8a8a : 0xffffff)
     }

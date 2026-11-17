@@ -1,10 +1,11 @@
 // Parry!: a rival pirate winds up, showing an arrow for the direction of the strike, and strikes on each hit
 // of the clip's beat map. Press that arrow on the beat to parry: graded by timing like every rhythm game.
 // The wrong arrow, or bad timing, is a miss; a quarter or more missed knocks the player out. Spec in
-// MINIGAMES.md. Fighter art by Cadence (the rival is the same art, mirrored and tinted, until it has its own).
+// MINIGAMES.md. Fighter art and the ship deck background by Cadence.
 import type Phaser from 'phaser'
 import type { GameInput, HitGrade, MiniGame, MiniGameParams, Status, TaskMeta } from '../../types/minigame'
 import { addArrow, ARROW_ANGLES, type Direction, directionGrade } from '../shared/arrows'
+import { addBackdrop, loadBackdrop } from '../shared/backdrop'
 import { DEATH_FREEZE, deathLift } from '../shared/deathFall'
 import { textStyle } from '../shared/font'
 import { HIT_WINDOW, judgePress, tooManyMisses, windowScaleFor } from '../shared/judgePress'
@@ -14,15 +15,14 @@ import { pickDirections, tellBeatsFor, windUp } from './strikes'
 
 // Texture keys, prefixed with the game ID so they never clash with another game's. The art faces right.
 const GUARD = 'parry_guard'
-const JAB = 'parry_jab'
 const COUNTER = 'parry_counter'
-const LUNGE = 'parry_lunge'
 const DEATH_JUMP = 'parry_death_jump'
+const RIVAL_IDLE = 'parry_rival_idle'
+const RIVAL_GUARD = 'parry_rival_guard' // winding up a strike
+const RIVAL_PUNCH = 'parry_rival_punch' // a strike that landed
 
-const SKY_COLOR = 0x6fb3dc
 const DECK_COLOR = 0x7a4d24
 const SEAM_COLOR = 0x4a2e14
-const RIVAL_TINT = 0x8fa8ff // until the rival has its own art
 const ARROW_COLOR = 0xffcc4d
 const CLASH_SHOW = 0.25 // seconds the parry clash or the landed strike stays on screen
 
@@ -32,7 +32,7 @@ export class ParryGame implements MiniGame {
     kind: 'task',
     prompt: 'PARRY!',
     hint: 'ARROWS',
-    canHideBackground: true, // a sky over the deck: hide it to put a level video behind the duel
+    canHideBackground: true, // the painted ship deck: hide it to put a level video behind the duel
     baseBeats: 2,
     defaultHits: [1], // the strike lands on the 2nd beat of each 2-beat cycle
   }
@@ -58,13 +58,15 @@ export class ParryGame implements MiniGame {
 
   preload(load: Phaser.Loader.LoaderPlugin): void {
     load.image(GUARD, '/assets/sprites/punching_character/punch1.png')
-    load.image(JAB, '/assets/sprites/punching_character/punch2.png')
     load.image(COUNTER, '/assets/sprites/punching_character/punch3.png')
-    load.image(LUNGE, '/assets/sprites/punching_character/lunge.png')
     load.image(DEATH_JUMP, '/assets/sprites/jumping_character/jumpingforwards.png')
+    load.image(RIVAL_IDLE, '/assets/sprites/rival_character/Rival1.png')
+    load.image(RIVAL_GUARD, '/assets/sprites/rival_character/Rival2.png')
+    load.image(RIVAL_PUNCH, '/assets/sprites/rival_character/Rival3.png')
+    loadBackdrop(load, 'deck')
   }
 
-  // Plans the strike directions, then builds the sky, deck, both fighters, the arrow, and the text.
+  // Plans the strike directions, then builds the deck, both fighters, the arrow, and the text.
   start(params: MiniGameParams): void {
     this.params = params
     this.hits = params.hits ?? []
@@ -79,13 +81,16 @@ export class ParryGame implements MiniGame {
       return object
     }
 
-    // Background layer (the sky), skipped when the level turns it off. The deck and everything after are
-    // the foreground.
+    // Background layer: Cadence's ship deck, floor included. When the level hides it (to show a video), a
+    // plain deck floor is drawn instead so the fighters still have something to stand on.
     const groundTop = Math.round(height * 0.75)
-    if (params.background) add(scene.add.rectangle(width / 2, groundTop / 2, width, groundTop, SKY_COLOR))
-    add(scene.add.rectangle(width / 2, (groundTop + height) / 2, width, height - groundTop, DECK_COLOR))
-    for (let i = 1; i < 3; i++) {
-      add(scene.add.rectangle(width / 2, groundTop + ((height - groundTop) * i) / 3, width, u(scene, 1.5), SEAM_COLOR))
+    if (params.background) {
+      add(addBackdrop(scene, 'deck'))
+    } else {
+      add(scene.add.rectangle(width / 2, (groundTop + height) / 2, width, height - groundTop, DECK_COLOR))
+      for (let i = 1; i < 3; i++) {
+        add(scene.add.rectangle(width / 2, groundTop + ((height - groundTop) * i) / 3, width, u(scene, 1.5), SEAM_COLOR))
+      }
     }
 
     // The two fighters face each other, anchored at their feet so every frame lines up.
@@ -93,7 +98,7 @@ export class ParryGame implements MiniGame {
     const fighterHeight = height * 0.42
     this.player = add(scene.add.image(width * 0.32, this.feetY, GUARD).setOrigin(0.5, 1))
     this.player.setScale(fighterHeight / this.player.height)
-    this.rival = add(scene.add.image(width * 0.68, this.feetY, GUARD).setOrigin(0.5, 1).setFlipX(true).setTint(RIVAL_TINT))
+    this.rival = add(scene.add.image(width * 0.68, this.feetY, RIVAL_IDLE).setOrigin(0.5, 1).setFlipX(true)) // faces left
     this.rival.setScale(fighterHeight / this.rival.height)
 
     // The arrow over the rival's head, with a ring that shrinks onto it as the strike nears.
@@ -174,7 +179,7 @@ export class ParryGame implements MiniGame {
     if (parried) rivalX += width * 0.05 * fade
     else if (struck) rivalX -= width * 0.12 * fade
     else if (telling) rivalX += width * 0.02 * progress
-    this.rival.setTexture(struck ? LUNGE : telling && progress > 0.7 ? JAB : GUARD).setX(rivalX)
+    this.rival.setTexture(struck ? RIVAL_PUNCH : telling ? RIVAL_GUARD : RIVAL_IDLE).setX(rivalX)
     this.clash.setAlpha(parried ? fade : 0)
 
     if (this.diedAt !== null) {

@@ -19,10 +19,12 @@ const RIGHT = ['x_marks_right1', 'x_marks_right2']
 const SAND = 'x_marks_sand'
 const DEATH_JUMP = 'x_marks_death_jump'
 const TILE = 32 // the sand art's size in pixels, which is also its size in design pixels
+const SIGN = 'x_marks_sign' // the X on a signpost, planted on the next spot
+const CHEST_SHUT = 'x_marks_chest_shut'
+const CHEST_OPEN = 'x_marks_chest_open'
+const HOLE = 'x_marks_hole'
 
-const X_COLOR = 0xc0392b
-const CHEST_COLOR = 0xd9a441
-const HOLE_COLOR = 0x5c4325
+const CHEST_POP = 0.25 // seconds a found chest stays shut before it bursts open
 const STEP_TIME = 0.14 // seconds per walking frame
 
 type Facing = 'up' | 'down' | 'left' | 'right'
@@ -53,7 +55,8 @@ export class XMarksTheSpotGame implements MiniGame {
   private diedAt: number | null = null
   private objects: Phaser.GameObjects.GameObject[] = [] // everything added to the scene, for destroy()
   private pirate!: Phaser.GameObjects.Image
-  private mark!: Phaser.GameObjects.Container // the current X
+  private mark!: Phaser.GameObjects.Image // the signpost on the current X
+  private chests: { image: Phaser.GameObjects.Image; at: number }[] = [] // found chests, which pop open
   private ring!: Phaser.GameObjects.Arc
   private label!: Phaser.GameObjects.Text
 
@@ -67,6 +70,10 @@ export class XMarksTheSpotGame implements MiniGame {
     load.image(RIGHT[1], `${folder}/topdownright2.png`)
     load.image(SAND, '/assets/sprites/floortiles/sand.png')
     load.image(DEATH_JUMP, '/assets/sprites/jumping_character/jumpingforwards.png')
+    load.image(SIGN, '/assets/sprites/decorations/XSign.png')
+    load.image(CHEST_SHUT, '/assets/sprites/decorations/ClosedTreasure.png')
+    load.image(CHEST_OPEN, '/assets/sprites/decorations/OpenTreasure.png')
+    load.image(HOLE, '/assets/sprites/decorations/Hole.png')
   }
 
   // Plans every dig up front, then builds the island, the X, its ring, the pirate, and the text.
@@ -89,13 +96,9 @@ export class XMarksTheSpotGame implements MiniGame {
       }
     }
 
-    // The X (two crossed bars) and the ring that shrinks onto it as its dig nears.
-    const arm = this.reach * height * 0.9
-    const bar = u(scene, 5)
-    this.mark = scene.add.container(0, 0, [
-      scene.add.rectangle(0, 0, arm * 2, bar, X_COLOR).setAngle(45),
-      scene.add.rectangle(0, 0, arm * 2, bar, X_COLOR).setAngle(-45),
-    ])
+    // The X signpost, planted with its foot on the spot, and the ring that shrinks onto it as its dig nears.
+    this.mark = scene.add.image(0, 0, SIGN).setOrigin(0.5, 0.92)
+    this.mark.setScale((this.reach * height * 2.4) / this.mark.height)
     this.ring = scene.add.circle(0, 0, this.reach * height).setStrokeStyle(u(scene, 2), 0xffffff)
 
     // The pirate, seen from above, centered on her spot.
@@ -157,7 +160,8 @@ export class XMarksTheSpotGame implements MiniGame {
   }
 
   // The next X is settled (Perfect on time, Good a little late, or Miss): report it, and leave a chest
-  // (found) or an empty hole (missed) on the sand. A quarter or more missed fails.
+  // (found, which pops open a moment later) or an empty hole (missed) on the sand. A quarter or more missed
+  // fails.
   private dig(grade: HitGrade): void {
     const { scene } = this.params
     const { width, height } = scene.scale
@@ -165,11 +169,10 @@ export class XMarksTheSpotGame implements MiniGame {
     this.checkedDig = false
     this.params.report(grade)
     this.objects.push(showJudgement(scene, grade, null, spot.x * width, spot.y * height - height * 0.1))
-    const size = this.reach * height
-    const left = grade === 'miss'
-      ? scene.add.ellipse(spot.x * width, spot.y * height, size * 1.4, size * 0.9, HOLE_COLOR)
-      : scene.add.rectangle(spot.x * width, spot.y * height, size * 1.2, size * 0.9, CHEST_COLOR).setStrokeStyle(u(scene, 2), 0x5c3a1a)
-    this.objects.push(left.setDepth(1))
+    const left = scene.add.image(spot.x * width, spot.y * height, grade === 'miss' ? HOLE : CHEST_SHUT).setDepth(1)
+    left.setScale((this.reach * height * (grade === 'miss' ? 2.4 : 1.9)) / left.width)
+    this.objects.push(left)
+    if (grade !== 'miss') this.chests.push({ image: left, at: this.lastTime })
     if (grade === 'miss') this.misses++
     this.next++
     if (tooManyMisses(this.misses, this.digs.length)) {
@@ -191,6 +194,11 @@ export class XMarksTheSpotGame implements MiniGame {
     }
     this.mark.setVisible(showing)
     this.ring.setVisible(showing)
+    for (const chest of this.chests) {
+      if (songTime - chest.at < CHEST_POP || chest.image.texture.key === CHEST_OPEN) continue
+      const shown = chest.image.displayWidth
+      chest.image.setTexture(CHEST_OPEN).setScale(shown / chest.image.width) // same width, now open
+    }
 
     if (this.diedAt !== null) {
       const sinceDeath = songTime - this.diedAt

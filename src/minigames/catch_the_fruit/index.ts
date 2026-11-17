@@ -1,9 +1,10 @@
 // Catch the Fruit: fruit falls onto a beach, and the pirate walks left and right (hold the arrows) to catch
 // each one in her bucket. With beat sync on, every fruit lands on a beat map hit, osu-style. Each catch is
 // graded by how close to the bucket's center it lands; the game fails once a quarter or more of the fruit
-// is dropped. Spec in MINIGAMES.md. Art by Cadence.
+// is dropped. Spec in MINIGAMES.md. Art by Cadence, including the island beach background.
 import type Phaser from 'phaser'
 import type { DurationMeta, GameInput, HitGrade, MiniGame, MiniGameParams, Status } from '../../types/minigame'
+import { addBackdrop, loadBackdrop } from '../shared/backdrop'
 import { textStyle } from '../shared/font'
 import { tooManyMisses } from '../shared/judgePress'
 import { showJudgement } from '../shared/judgeText'
@@ -18,7 +19,6 @@ const WALK = ['catch_the_fruit_walk1', 'catch_the_fruit_walk2'] // walking frame
 const SAND = 'catch_the_fruit_sand'
 const TILE = 32 // the sand art's size in pixels, which is also its size in design pixels
 
-const SKY_COLOR = 0x8fd3f4
 const STEP_TIME = 0.14 // seconds per walking frame
 const BUCKET_HEIGHT = 0.55 // where the bucket's rim is on the pirate art, as a fraction from her feet up
 
@@ -35,7 +35,7 @@ export class CatchTheFruitGame implements MiniGame {
     kind: 'duration',
     prompt: 'CATCH!',
     hint: '← →',
-    canHideBackground: true, // a sky over the ground: hide it to put a level video behind the game
+    canHideBackground: true, // the island beach: hide it to put a level video behind the game
     minDuration: 4,
     canBeatSync: true,
     defaultHits: [0, 2], // beat sync on: fruit lands on beats 1 and 3 of each bar
@@ -63,6 +63,7 @@ export class CatchTheFruitGame implements MiniGame {
     load.image(WALK[0], '/assets/sprites/bucket_character/sidebucket1.png')
     load.image(WALK[1], '/assets/sprites/bucket_character/sidebucket2.png')
     load.image(SAND, '/assets/sprites/floortiles/sand.png')
+    loadBackdrop(load, 'island')
     for (const name of FRUITS) load.image(`catch_the_fruit_${name}`, `/assets/sprites/fruits/${name}.png`)
   }
 
@@ -78,14 +79,18 @@ export class CatchTheFruitGame implements MiniGame {
     const { width, height } = scene.scale
     const groundTop = Math.round(height * 0.8)
     const tileSize = u(scene, TILE)
-    // Background layer (the sky), skipped when the level turns it off so its video shows through.
-    if (params.background) this.objects.push(scene.add.rectangle(width / 2, groundTop / 2, width, groundTop, SKY_COLOR))
-    // Foreground layer from here on: the sand, the pirate, and the fruit.
-    for (let y = groundTop; y < height; y += tileSize) {
-      for (let x = 0; x < width; x += tileSize) {
-        this.objects.push(scene.add.image(x, y, SAND).setOrigin(0, 0).setScale(tileSize / TILE))
+    // Background layer: Cadence's island beach, sand included. When the level hides it (to show a video),
+    // a strip of sand tiles is drawn instead so the pirate still has a beach to walk on.
+    if (params.background) {
+      this.objects.push(addBackdrop(scene, 'island'))
+    } else {
+      for (let y = groundTop; y < height; y += tileSize) {
+        for (let x = 0; x < width; x += tileSize) {
+          this.objects.push(scene.add.image(x, y, SAND).setOrigin(0, 0).setScale(tileSize / TILE))
+        }
       }
     }
+    // Foreground layer from here on: the pirate and the fruit.
 
     // The pirate stands on the sand, anchored at her feet so every frame lines up.
     this.feetY = groundTop + height * 0.06

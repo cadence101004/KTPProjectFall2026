@@ -20,6 +20,14 @@ export interface MediaView {
   selected: boolean
 }
 
+// How one sound effect looks on the SFX lane: a block from where it starts, as long as its sound file.
+export interface SfxView {
+  at: number
+  length: number // seconds; the sound file's length (a small stub if it isn't loaded)
+  label: string
+  selected: boolean
+}
+
 // The editor's waveform strip. wavesurfer only draws; playback always goes through AudioClock,
 // so what you hear in the editor is timed exactly like the game.
 export class Timeline {
@@ -31,6 +39,8 @@ export class Timeline {
   private readonly knob: HTMLDivElement
   private readonly mediaTrack: HTMLDivElement // the media lane under the waveform; scrolls and zooms with it
   private readonly mediaPlayhead: HTMLDivElement
+  private readonly sfxTrack: HTMLDivElement // the SFX lane under the media lane; scrolls and zooms with it
+  private readonly sfxPlayhead: HTMLDivElement
   private readonly scrollThumb: HTMLDivElement // our own scrollbar's thumb (see onScrollbar)
   private duration = 0
 
@@ -45,6 +55,16 @@ export class Timeline {
     lane.append(this.mediaTrack)
     container.after(lane)
 
+    // SFX lane below that: the third track, holding the player's own sound effects.
+    const sfxLane = document.createElement('div')
+    sfxLane.className = 'media-lane sfx-lane'
+    this.sfxTrack = document.createElement('div')
+    this.sfxTrack.className = 'media-track'
+    this.sfxPlayhead = document.createElement('div')
+    this.sfxPlayhead.className = 'media-playhead'
+    sfxLane.append(this.sfxTrack)
+    lane.after(sfxLane)
+
     // Our own horizontal scrollbar under the media lane. Browsers always show the plain system arrow over
     // a native scrollbar, so wavesurfer's is hidden and this one (which shows the hook cursor) drives it.
     const scrollbar = document.createElement('div')
@@ -52,7 +72,7 @@ export class Timeline {
     this.scrollThumb = document.createElement('div')
     this.scrollThumb.className = 'timeline-thumb'
     scrollbar.append(this.scrollThumb)
-    lane.after(scrollbar)
+    sfxLane.after(scrollbar)
 
     // Scrub bar above the waveform. Normal page DOM (outside wavesurfer), so editor.css styles it.
     const ruler = document.createElement('div')
@@ -187,7 +207,8 @@ export class Timeline {
     this.playhead.style.left = position
     this.knob.style.left = position
     this.mediaPlayhead.style.left = position
-    for (const track of [this.rulerTrack, this.mediaTrack]) {
+    this.sfxPlayhead.style.left = position
+    for (const track of [this.rulerTrack, this.mediaTrack, this.sfxTrack]) {
       track.style.width = `${this.waves.getWrapper().offsetWidth}px`
       track.style.transform = `translateX(${-this.waves.getScroll()}px)`
     }
@@ -264,6 +285,52 @@ export class Timeline {
       if (mode === 'move') move(index, (left + dx) * secondsPerPixel())
       else if (mode === 'start') resize(index, 'start', (left + dx) * secondsPerPixel())
       else resize(index, 'end', (left + width + dx) * secondsPerPixel())
+    })
+  }
+
+  // Redraws the SFX lane's blocks. Each block's index matches its cue in the level's SFX track.
+  showSfx(cues: SfxView[]): void {
+    if (this.duration === 0) return
+    const blocks = cues.map((cue, index) => {
+      const block = document.createElement('div')
+      block.className = cue.selected ? 'media-block sfx-block selected' : 'media-block sfx-block'
+      block.dataset.index = String(index)
+      block.title = cue.label
+      block.style.left = `${(cue.at / this.duration) * 100}%`
+      block.style.width = `${(cue.length / this.duration) * 100}%`
+      block.append(Object.assign(document.createElement('span'), { className: 'media-label', textContent: cue.label }))
+      return block
+    })
+    this.sfxTrack.replaceChildren(...blocks, this.sfxPlayhead)
+  }
+
+  // Clicking a sound's block selects it; dragging it moves it. `move` gets the dropped start time before
+  // snapping (the editor applies that).
+  onSfxEdit(select: (index: number) => void, move: (index: number, at: number) => void): void {
+    let drag: { index: number; startX: number; left: number; moved: boolean } | null = null
+    const secondsPerPixel = () => this.duration / this.sfxTrack.getBoundingClientRect().width
+    const blockAt = (index: number) => this.sfxTrack.querySelector<HTMLElement>(`.sfx-block[data-index="${index}"]`)
+
+    this.sfxTrack.addEventListener('pointerdown', event => {
+      const block = (event.target as HTMLElement).closest<HTMLElement>('.sfx-block')
+      if (!block) return
+      const index = Number(block.dataset.index)
+      drag = { index, startX: event.clientX, left: block.offsetLeft, moved: false }
+      this.sfxTrack.setPointerCapture(event.pointerId)
+      select(index)
+    })
+    this.sfxTrack.addEventListener('pointermove', event => {
+      if (!drag) return
+      const dx = event.clientX - drag.startX
+      if (Math.abs(dx) > 3) drag.moved = true
+      const block = blockAt(drag.index)
+      if (drag.moved && block) block.style.left = `${drag.left + dx}px` // live preview; placed properly on release
+    })
+    this.sfxTrack.addEventListener('pointerup', event => {
+      if (!drag) return
+      const { index, startX, left, moved } = drag
+      drag = null
+      if (moved) move(index, (left + event.clientX - startX) * secondsPerPixel())
     })
   }
 

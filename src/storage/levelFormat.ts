@@ -1,4 +1,4 @@
-import type { Clip, Level, MediaClip } from '../types/level'
+import type { Clip, Level, MediaClip, SfxCue } from '../types/level'
 
 // Turns stored or imported JSON into a valid Level: fills in fields that older levels lack, drops broken
 // clips, and sorts clips by start time. Throws if the data isn't a level at all.
@@ -17,7 +17,17 @@ export function normalizeLevel(raw: unknown): Level {
     clips,
     media: (Array.isArray(data.media) ? data.media : []).filter(isValidMedia).sort((a, b) => a.start - b.start),
     ...(typeof data.mediaEnabled === 'boolean' ? { mediaEnabled: data.mediaEnabled } : {}),
+    sfx: (Array.isArray(data.sfx) ? data.sfx : []).filter(isValidSfx).sort((a, b) => a.at - b.at),
   }
+}
+
+function isValidSfx(cue: unknown): cue is SfxCue {
+  if (typeof cue !== 'object' || cue === null) return false
+  const c = cue as Partial<SfxCue>
+  if (typeof c.soundHash !== 'string' || !c.soundHash || typeof c.at !== 'number' || !(c.at >= 0)) return false
+  c.name = typeof c.name === 'string' ? c.name : 'sound'
+  c.volume = typeof c.volume === 'number' ? Math.min(1, Math.max(0, c.volume)) : 1
+  return true
 }
 
 function isValidMedia(clip: unknown): clip is MediaClip {

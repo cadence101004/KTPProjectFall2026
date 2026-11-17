@@ -7,6 +7,7 @@
 // The pirate and cannonball are Cadence's; rafts are placeholder shapes.
 import type Phaser from 'phaser'
 import type { DurationMeta, GameInput, MiniGame, MiniGameParams, Status } from '../../types/minigame'
+import { addBackdrop, loadBackdrop } from '../shared/backdrop'
 import { DEATH_FREEZE, deathLift } from '../shared/deathFall'
 import { textStyle } from '../shared/font'
 import { showJudgement } from '../shared/judgeText'
@@ -21,7 +22,6 @@ const FALL = 'flotsam_hop_fall'
 const DEATH_JUMP = 'flotsam_hop_death_jump'
 const BALL = 'flotsam_hop_ball'
 
-const SKY_COLOR = 0x8fd3f4
 const SEA_COLOR = 0x2f7fb8
 const RAFT_COLOR = 0x9b6a3a
 const FALL_LIMIT = 3 // the third fall knocks her out
@@ -50,7 +50,7 @@ export class FlotsamHopGame implements MiniGame {
     kind: 'duration',
     prompt: 'HOP!',
     hint: '← →  ↑ JUMP',
-    canHideBackground: true, // a sky over the sea: hide it to put a level video behind the rafts
+    canHideBackground: true, // Cadence's ocean: hide it to put a level video behind the rafts
     minDuration: 4,
     canBeatSync: true,
     defaultHits: [0], // beat sync on: a raft sinks on the first beat of each bar
@@ -84,6 +84,7 @@ export class FlotsamHopGame implements MiniGame {
     load.image(FALL, '/assets/sprites/jumping_character/jumpingsideways2.png')
     load.image(DEATH_JUMP, '/assets/sprites/jumping_character/jumpingforwards.png')
     load.image(BALL, '/assets/sprites/cannons/cannonball.png')
+    loadBackdrop(load, 'ocean')
   }
 
   // Plans the sinks and the cannonballs, then builds the sky, rafts, cannonballs, pirate, sea, and text.
@@ -103,8 +104,8 @@ export class FlotsamHopGame implements MiniGame {
       return object
     }
 
-    // Background layer (the sky), skipped when the level turns it off. Everything after is the foreground.
-    if (params.background) add(scene.add.rectangle(width / 2, (SEA_Y * height) / 2, width, SEA_Y * height, SKY_COLOR))
+    // Background layer (Cadence's ocean), skipped when the level turns it off. Everything after is the foreground.
+    if (params.background) add(addBackdrop(scene, 'ocean'))
     this.raftShapes = RAFTS.map(raft =>
       add(scene.add.rectangle(0, 0, raft.width * width, height * 0.035, RAFT_COLOR).setOrigin(0.5, 0).setStrokeStyle(u(scene, 1.5), 0x5c3a1a)),
     )

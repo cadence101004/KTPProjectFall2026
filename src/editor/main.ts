@@ -11,9 +11,9 @@ import { listenForKeys } from '../engine/input'
 import { LevelScene } from '../engine/LevelScene'
 import { MediaLayer } from '../engine/MediaLayer'
 import { allGames, metaFor } from '../minigames/allGames'
-import { listLevels, loadLevel, loadSong, saveLevel, saveMedia, saveSong } from '../storage/db'
+import { listLevels, loadLevel, loadSong, loadSound, saveLevel, saveMedia, saveSong, saveSound } from '../storage/db'
 import { loadMediaFiles, type MediaFile, mediaUrls } from '../storage/mediaFiles'
-import type { Clip, GameClip, Level, MediaClip } from '../types/level'
+import type { Clip, GameClip, Level, MediaClip, SfxCue } from '../types/level'
 import type { MiniGameMeta } from '../types/minigame'
 import { type BeatGrid, beatTimes, snapToGrid } from './beatGrid'
 import { freeGaps, placeMove, placeResize, snapLength } from './clipEditing'
@@ -69,6 +69,12 @@ app.innerHTML = `
       <span id="mediaInfo"></span>
     </div>
     <div id="mediaOptions" class="media-options"></div>
+    <div class="media-controls">
+      <b>SFX track</b>
+      <label class="file-button">Add sound at playhead<input id="sfxFile" type="file" accept="audio/*" /></label>
+      <span id="sfxInfo"></span>
+    </div>
+    <div id="sfxOptions" class="media-options"></div>
     <div class="palette">
       <span>Add at playhead:</span>
       <button data-add="">Buffer</button>
@@ -82,7 +88,8 @@ app.innerHTML = `
       or click empty waveform. Space plays and pauses. Drag a clip to move it,
       drag its edges to resize. Delete removes the selected clip. Set BPM and the first beat so the grid lines
       land on the drums; clip edges then snap to the grid. Drag a media block's edges to trim it. Cut (C) splits the media under the playhead so each
-      piece can have its own blur and dim. Ctrl+S saves. Preview (P) plays the level as a player
+      piece can have its own blur and dim. Sounds on the SFX track play once where they start; drag them along it
+      (they snap to the grid like clips). Ctrl+S saves. Preview (P) plays the level as a player
       sees it, with the game controls live; Esc stops it. Fullscreen (F) fills the screen with the gameplay view.</p>
   </div>`
 
@@ -113,7 +120,7 @@ levelScene.setGameOverOptions([
 ])
 
 function newLevel(audioHash = ''): Level {
-  return { title: 'Untitled level', audioHash, bpm: 120, beatOffset: 0, clips: [], media: [] }
+  return { title: 'Untitled level', audioHash, bpm: 120, beatOffset: 0, clips: [], media: [], sfx: [] }
 }
 
 let level = newLevel()
@@ -127,7 +134,10 @@ let playing = false
 let previewing = false // playing with the level running in the gameplay view and game controls live
 let playhead = 0 // song time while paused; while playing, the clock is the truth
 let selected = -1 // index of the selected clip, or -1
-let selectedMedia = -1 // index of the selected media clip, or -1 (only one of the two is ever selected)
+let selectedMedia = -1 // index of the selected media clip, or -1 (only one of clip, media, or sound is ever selected)
+let selectedSfx = -1 // index of the selected sound on the SFX track, or -1
+// Sound files this session knows about, by soundHash, decoded for playback and for their length on the lane.
+const sounds = new Map<string, { name: string; file: Blob; buffer: AudioBuffer }>()
 const mediaFiles = new Map<string, MediaFile>() // media files this session knows about, by mediaHash
 const mediaLayer = new MediaLayer($('stage'), currentTime, () => playing) // shows the frame under the playhead too
 
@@ -143,6 +153,21 @@ async function play(): Promise<void> {
   playing = true
   playButton.textContent = 'Pause'
   await clock.play(playhead)
+  if (!previewing) playAllSfx() // a preview's LevelScene schedules them itself
+}
+
+// Plain playback (no preview): hands every sound still ahead of (or under) the playhead to the clock at once,
+// so the SFX track is heard while placing sounds. Stopping the song stops them all.
+function playAllSfx(): void {
+  for (const cue of level.sfx) {
+    const sound = sounds.get(cue.soundHash)
+    if (sound && cue.at + sound.buffer.duration > playhead) clock.playSfx(sound.buffer, cue.at, 1, 0, cue.volume)
+  }
+}
+
+// The decoded sound files, for LevelScene.setSounds.
+function soundBuffers(): Map<string, AudioBuffer> {
+  return new Map([...sounds].map(([hash, sound]) => [hash, sound.buffer]))
 }
 
 function pause(): void {
@@ -166,6 +191,7 @@ async function startPreview(): Promise<void> {
   previewOrigin = playhead
   previewing = true
   $('preview').textContent = 'Stop preview'
+  levelScene.setSounds(soundBuffers())
   await play()
   levelScene.startAt(level, playhead)
 }
@@ -256,7 +282,81 @@ function render(): void {
     : 'No clip selected.'
   renderClipOptions(clip)
   renderMedia()
+  renderSfx()
   renderCountdown()
+}
+
+// The SFX track: lane blocks (as long as each sound), the missing-file notice, and the selected sound's settings.
+function renderSfx(): void {
+  timeline.showSfx(
+    level.sfx.map((cue, index) => ({
+      at: cue.at,
+      length: sounds.get(cue.soundHash)?.buffer.duration ?? 0.25,
+      label: cue.name,
+      selected: index === selectedSfx,
+    })),
+  )
+  const missing = level.sfx.filter(cue => !sounds.has(cue.soundHash)).length
+  $('sfxInfo').textContent = missing ? `${missing} sound${missing === 1 ? '' : 's'} not in this browser` : ''
+  renderSfxOptions(level.sfx[selectedSfx])
+}
+
+// Settings for the selected sound: its start time, volume, and a delete button.
+function renderSfxOptions(cue: SfxCue | undefined): void {
+  const panel = $('sfxOptions')
+  panel.replaceChildren()
+  if (!cue) return
+  const at = Object.assign(document.createElement('input'), { type: 'number', min: '0', step: '0.01', value: cue.at.toFixed(2) })
+  at.addEventListener('change', () => moveSfx(level.sfx.indexOf(cue), Number(at.value) || 0, false))
+  const volume = Object.assign(document.createElement('input'), { type: 'range', min: '0', max: '1', step: '0.05', value: String(cue.volume) })
+  volume.addEventListener('input', () => (cue.volume = Number(volume.value)))
+  const remove = Object.assign(document.createElement('button'), { textContent: 'Delete sound', className: 'danger' })
+  remove.addEventListener('click', deleteSelected)
+  const field = (label: string, input: HTMLInputElement) => {
+    const wrap = document.createElement('label')
+    wrap.append(`${label} `, input)
+    return wrap
+  }
+  panel.append(Object.assign(document.createElement('b'), { textContent: cue.name }), field('Starts at (s)', at), field('Volume', volume), remove)
+}
+
+// Adds a sound to the SFX track at the playhead (snapped to the beat grid when snapping is on).
+async function addSfx(file: File): Promise<void> {
+  if (songLength === 0) {
+    setStatus('Load a song before adding sounds.')
+    return
+  }
+  endPreview() // the running preview numbers the cues it has played; adding one would shift them
+  setWaiting(true)
+  try {
+    const hash = await hashFile(file)
+    if (!sounds.has(hash)) sounds.set(hash, { name: file.name, file, buffer: await clock.decode(file) })
+    const cue: SfxCue = { name: file.name, soundHash: hash, at: Math.min(songLength, snapToGrid(playhead, grid())), volume: 1 }
+    level.sfx.push(cue)
+    level.sfx.sort((a, b) => a.at - b.at)
+    selectSfx(level.sfx.indexOf(cue))
+  } catch {
+    setStatus(`Could not read ${file.name} as a sound.`)
+  } finally {
+    setWaiting(false)
+  }
+}
+
+// Moves a sound (dragged on its lane, or typed in). A drag snaps to the beat grid; a typed time is exact.
+function moveSfx(index: number, at: number, snap = true): void {
+  const cue = level.sfx[index]
+  if (!cue) return
+  endPreview()
+  cue.at = Math.min(songLength, Math.max(0, snap ? snapToGrid(at, grid()) : at))
+  level.sfx.sort((a, b) => a.at - b.at)
+  selectSfx(level.sfx.indexOf(cue))
+}
+
+function selectSfx(index: number): void {
+  selectedSfx = index
+  selected = -1
+  selectedMedia = -1
+  render()
 }
 
 // The countdown speed field's "auto" hint, and a warning when buffers are too short for the whole
@@ -438,6 +538,7 @@ function cutMediaAtPlayhead(): void {
 function selectMedia(index: number): void {
   selectedMedia = index
   selected = -1
+  selectedSfx = -1
   render()
 }
 
@@ -624,6 +725,13 @@ function changeOffset(offset: number): void {
 }
 
 function deleteSelected(): void {
+  if (level.sfx[selectedSfx]) {
+    endPreview()
+    level.sfx.splice(selectedSfx, 1)
+    selectedSfx = -1
+    render()
+    return
+  }
   if (level.media[selectedMedia]) {
     level.media.splice(selectedMedia, 1)
     selectedMedia = -1
@@ -647,6 +755,7 @@ async function openSong(file: Blob, name: string): Promise<void> {
     for (const [hash, media] of await loadMediaFiles(level.media.filter(clip => !mediaFiles.has(clip.mediaHash)))) {
       mediaFiles.set(hash, media)
     }
+    await loadLevelSounds()
   } finally {
     setWaiting(false)
   }
@@ -656,6 +765,7 @@ async function openSong(file: Blob, name: string): Promise<void> {
   playhead = 0
   selected = -1
   selectedMedia = -1
+  selectedSfx = -1
   await timeline.show(computePeaks(buffer.getChannelData(0), buffer.sampleRate), songLength)
   $('length').textContent = songLength.toFixed(2)
   playButton.disabled = false
@@ -664,6 +774,21 @@ async function openSong(file: Blob, name: string): Promise<void> {
   $<HTMLButtonElement>('save').disabled = false
   drawGrid()
   render()
+}
+
+// Loads and decodes the stored sound files the level's SFX track uses that this session doesn't have yet.
+// A missing or unreadable file is skipped (its cues show a small stub on the lane and stay silent).
+async function loadLevelSounds(): Promise<void> {
+  for (const hash of new Set(level.sfx.map(cue => cue.soundHash))) {
+    if (sounds.has(hash)) continue
+    const stored = await loadSound(hash)
+    if (!stored) continue
+    try {
+      sounds.set(hash, { ...stored, buffer: await clock.decode(stored.file) })
+    } catch {
+      // not playable: leave it out
+    }
+  }
 }
 
 // The song picker. Normally this starts a fresh level on the new song; if a loaded level is waiting for
@@ -704,6 +829,10 @@ async function save(): Promise<void> {
     const media = mediaFiles.get(hash)
     if (media) await saveMedia(hash, media.name, media.file)
   }
+  for (const hash of new Set(level.sfx.map(cue => cue.soundHash))) {
+    const sound = sounds.get(hash)
+    if (sound) await saveSound(hash, sound.name, sound.file)
+  }
   await saveLevel(levelId, level)
   await refreshLevelList(levelId)
   setStatus(`Saved "${level.title}".`)
@@ -734,6 +863,7 @@ function startNewLevel(): void {
   waitingForSong = null
   selected = -1
   selectedMedia = -1
+  selectedSfx = -1
   syncInputs()
   drawGrid()
   render()
@@ -787,6 +917,13 @@ timeline.onSeek(seek)
 timeline.onScrub(scrub)
 timeline.onClipEdit(editClip)
 timeline.onMediaEdit(selectMedia, moveMedia, resizeMedia)
+timeline.onSfxEdit(selectSfx, (index, at) => moveSfx(index, at))
+$<HTMLInputElement>('sfxFile').addEventListener('change', event => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = '' // so picking the same file again still fires
+  if (file) void addSfx(file)
+})
 $('cutMedia').addEventListener('click', cutMediaAtPlayhead)
 $<HTMLInputElement>('mediaOn').addEventListener('change', event => {
   level.mediaEnabled = (event.target as HTMLInputElement).checked
@@ -800,6 +937,7 @@ $<HTMLInputElement>('mediaFile').addEventListener('change', event => {
 })
 timeline.onClipClick(index => {
   selectedMedia = -1
+  selectedSfx = -1
   selected = index
   render()
 })

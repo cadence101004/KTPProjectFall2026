@@ -10,6 +10,7 @@ import { LevelScene } from '../engine/LevelScene'
 import { MediaLayer } from '../engine/MediaLayer'
 import { listLevels, type LevelRecord, loadSong, saveSong } from '../storage/db'
 import { loadMediaFiles, type MediaFile, mediaUrls } from '../storage/mediaFiles'
+import { loadSoundBuffers } from '../storage/soundFiles'
 import type { Level } from '../types/level'
 
 // Play page: pick a saved level, then play it with real lives. Esc or Levels returns to the list.
@@ -102,12 +103,13 @@ async function pick(picked: Level): Promise<void> {
   await openLevel(picked, song.file)
 }
 
-// Decodes the song, loads the level's stored media, and shows the game view, ready to Start.
+// Decodes the song, loads the level's stored media and sound effects, and shows the game view, ready to Start.
 async function openLevel(picked: Level, file: Blob): Promise<void> {
-  setWaiting(true) // the hourglass cursor, until the song and its media are ready
+  setWaiting(true) // the hourglass cursor, until the song, media, and sounds are ready
   try {
     await clock.load(file)
     media = await loadMediaFiles(picked.media)
+    levelScene.setSounds(await loadSoundBuffers(picked.sfx, file => clock.decode(file)))
   } finally {
     setWaiting(false)
   }

@@ -45,6 +45,26 @@ describe('normalizeLevel', () => {
     expect(level.mediaEnabled).toBe(false)
   })
 
+  it('keeps valid sound effects in time order, fills in volume, and drops broken ones', () => {
+    const level = normalizeLevel({
+      clips: [],
+      sfx: [
+        { name: 'boom.mp3', soundHash: 'b', at: 4, volume: 2 }, // too loud: clamped
+        { soundHash: 'a', at: 1 }, // no name or volume: filled in
+        { name: 'x', at: 2 }, // no hash
+        { name: 'y', soundHash: 'c', at: -1 }, // before the song
+      ],
+    })
+    expect(level.sfx).toEqual([
+      { name: 'sound', soundHash: 'a', at: 1, volume: 1 },
+      { name: 'boom.mp3', soundHash: 'b', at: 4, volume: 1 },
+    ])
+  })
+
+  it('gives older levels an empty SFX track', () => {
+    expect(normalizeLevel({ clips: [] }).sfx).toEqual([])
+  })
+
   it('rejects data that is not a level', () => {
     expect(() => normalizeLevel('hello')).toThrow()
     expect(() => normalizeLevel({ title: 'no clips' })).toThrow()

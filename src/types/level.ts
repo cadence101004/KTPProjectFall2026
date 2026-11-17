@@ -40,6 +40,15 @@ export interface MediaClip {
   effects: MediaEffects
 }
 
+// A sound effect on the SFX track: one of the player's own audio files, played once at a song time,
+// scheduled on the song's clock so it lands exactly in sync (on the beat if it was snapped there).
+export interface SfxCue {
+  name: string // the file's name, shown in the editor
+  soundHash: string // SHA-256 of the file, stored in this browser's sounds store
+  at: number // song time it starts
+  volume: number // 0 (silent) to 1 (full)
+}
+
 export interface Level {
   title: string
   audioHash: string
@@ -49,4 +58,5 @@ export interface Level {
   clips: Clip[]
   media: MediaClip[]
   mediaEnabled?: boolean // the media track's on/off switch. Absent means on
+  sfx: SfxCue[] // the SFX track, in time order
 }

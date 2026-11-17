@@ -2,6 +2,7 @@
 // spark reaches it, on each hit of the clip's beat map. Spec in MINIGAMES.md. Art by Cadence.
 import type Phaser from 'phaser'
 import type { GameInput, MiniGame, MiniGameParams, Status, TaskMeta } from '../../types/minigame'
+import { addBackdrop, loadBackdrop } from '../shared/backdrop'
 import { textStyle } from '../shared/font'
 import { type Grade, HIT_WINDOW, judgePress, tooManyMisses, windowScaleFor } from '../shared/judgePress'
 import { showJudgement } from '../shared/judgeText'
@@ -22,7 +23,6 @@ const TILE = 32 // the grass art's size in pixels, which is also its size in des
 const TOUCH_HOLE = { x: 0.13, y: 0.4 }
 const MUZZLE = { x: 0.86, y: 0.3 }
 
-const SKY_COLOR = 0x5fa8d3
 const FUSE_COLOR = 0xc8a46a
 const SPARK_COLOR = 0xffcc4d
 
@@ -35,7 +35,7 @@ export class FireCannonGame implements MiniGame {
     kind: 'task',
     prompt: 'FIRE!',
     hint: 'SPACE',
-    canHideBackground: true, // a sky over the ground: hide it to put a level video behind the game
+    canHideBackground: true, // the ocean behind the field: hide it to put a level video behind the game
     baseBeats: 2,
     defaultHits: [1], // fire on the 2nd beat of each 2-beat cycle
   }
@@ -64,6 +64,7 @@ export class FireCannonGame implements MiniGame {
     load.image(CANNON_SHOOTING, '/assets/sprites/cannons/cannonshooting.png')
     load.image(BALL, '/assets/sprites/cannons/cannonball.png')
     load.image(BALL_PILE, '/assets/sprites/cannons/pilecannonballs.png')
+    loadBackdrop(load, 'ocean')
     for (const tile of new Set(GRASS)) load.image(`fire_cannon_${tile}`, `/assets/sprites/floortiles/${tile}.png`)
   }
 
@@ -80,13 +81,13 @@ export class FireCannonGame implements MiniGame {
       return object
     }
 
-    // Sky, then the grass field: whole tiles from groundTop down, with a random mix of the grass variants.
+    // Ocean, then the grass field: whole tiles from groundTop down, with a random mix of the grass variants.
     // Tiles are scaled up from their 32 px art by the same amount as the rest of the game (design pixels).
     const groundTop = Math.round(height * 0.7)
     const tileSize = u(scene, TILE)
-    // Background layer (the sky), skipped when the level turns it off so its video shows through. Everything
+    // Background layer (Cadence's ocean), skipped when the level turns it off so its video shows through. Everything
     // after it, from the grass on, is the foreground.
-    if (params.background) add(scene.add.rectangle(width / 2, groundTop / 2, width, groundTop, SKY_COLOR))
+    if (params.background) add(addBackdrop(scene, 'ocean'))
     for (let y = groundTop; y < height; y += tileSize) {
       for (let x = 0; x < width; x += tileSize) {
         const tile = GRASS[Math.floor(Math.random() * GRASS.length)]

@@ -116,6 +116,12 @@ Templates, rules for minigame authors, and the registry live in `src/minigames/`
 - **Video follows the audio clock, never the other way round.** Videos are always muted (the song is the only audio). Each frame, compare `video.currentTime` to `songTime - start + mediaOffset` and seek only if drift exceeds a small threshold (about 0.1 s), so playback stays smooth.
 - A failed or missing media file must never stop the level. Fall back to the default background.
 
+### SFX track (the player's own sound effects)
+
+- `sfx: [{ "name", "soundHash", "at", "volume" }]` in the level: each cue plays one audio file once, starting at song time `at`, with `volume` 0 to 1. Files are stored in IndexedDB by SHA-256 (db version 3, `sounds` store).
+- Cues are scheduled on the AudioClock's context (`playSfx`), a little ahead of time (`dueCues` in `src/engine/sfxCues.ts`), so they land sample-accurately. In the editor they snap to the beat grid when snapping is on, or sit anywhere when it's off.
+- A missing or unreadable sound file stays silent; it never stops the level.
+
 ## Level packs (.pwlevel)
 
 Levels are shared as a single `.pwlevel` file, which is a zip. Loading one must be a single click or drag-and-drop.
@@ -194,4 +200,8 @@ Scoring (`src/engine/scoring.ts`) with an end-of-level results screen and S-D ra
 
 **Known issue (low priority):** the editor's short-buffer countdown warning never appears for Connor, even though `shortCountdownBuffers` passes its tests. Next step if it matters: compare the "(buffers need X s)" number next to the Countdown field with the actual buffer length.
 
-Next: another minigame (Parry! or Parrot Says), level packs (build step 6), then the Play page bug if it still happens.
+Minigames built since: Parry!, Parrot Says, X Marks the Spot, Cannonball Barrage, and Flotsam Hop (all Connor). Per-clip game options (`meta.options`) exist.
+
+Cadence's painted backgrounds (island, ship deck, ocean) are shared through `src/minigames/shared/backdrop.ts` (`loadBackdrop`, `addBackdrop`, cover-scaled). Games whose backdrop already has a floor draw their plain floor only when the background is hidden. The SFX track (editor lane, Play, and preview) is done.
+
+Next: a polished local game with the built-in minigames and assets (real levels, Play page, polish). Level packs (build step 6) are a stretch goal for later. Fix the Play page bug if it still happens.

@@ -7,13 +7,14 @@ import type { GameInput, HitGrade, MiniGame } from '../types/minigame'
 import { hitTimes, optionsFor, repsFor } from './clipRules'
 import { COUNT_LABELS, type CountdownCue, goLead, planCountdown } from './countdown'
 import { LevelRunner, type RunnerEvent, type TimeSource } from './LevelRunner'
+import { dueCues } from './sfxCues'
 import { accuracyOf, addGrade, newSheet, type Rank, rankOf, type ScoreSheet, scoreClip, scoreOf } from './scoring'
 
 export const START_LIVES = 3
 
 // The song clock plus sound effects scheduled on it. AudioClock provides both.
 export interface LevelClock extends TimeSource {
-  playSfx(buffer: AudioBuffer, songTime: number, rate?: number, fileOffset?: number): void
+  playSfx(buffer: AudioBuffer, songTime: number, rate?: number, fileOffset?: number, volume?: number): boolean
 }
 
 // The 321GO sound and where its four counts fall inside the file (see countdownBeats).
@@ -37,6 +38,8 @@ export class LevelScene extends Phaser.Scene {
   private readonly clock: LevelClock
   private countdownSound: CountdownSound | null = null
   private countdown: { cue: CountdownCue; hint: string } | null = null // the cue running in the current buffer
+  private sounds = new Map<string, AudioBuffer>() // the SFX track's decoded files, by soundHash
+  private scheduledSfx = new Set<number>() // SFX cues (indexes into level.sfx) already handed to the clock
   private level: Level | null = null
   private runner: LevelRunner | null = null
   // The running minigame, plus how many hits its beat map has and how many it has reported, for scoring.
@@ -75,6 +78,11 @@ export class LevelScene extends Phaser.Scene {
   // uses this to show the auto countdown speed and to warn about buffers too short for the countdown.
   countdownFileBeats(): number[] | null {
     return this.countdownSound?.beats ?? null
+  }
+
+  // The level's sound effect files, decoded and keyed by soundHash. Cues whose file is missing stay silent.
+  setSounds(sounds: Map<string, AudioBuffer>): void {
+    this.sounds = sounds
   }
 
   // The buttons on the Game Over and results screens, e.g. Restart Level and Main Menu.
@@ -130,6 +138,7 @@ export class LevelScene extends Phaser.Scene {
     this.misses = 0
     this.sheet = newSheet()
     this.countdown = null
+    this.scheduledSfx = new Set()
     this.running = true
     this.banner.setText('')
     this.drawHud()
@@ -154,7 +163,9 @@ export class LevelScene extends Phaser.Scene {
   }
 
   update(): void {
-    if (!this.running || !this.runner || this.menu) return
+    if (!this.running || !this.runner) return
+    this.scheduleSfx() // the SFX track plays on under Game Over and the results, like the music
+    if (this.menu) return
     for (const event of this.runner.update()) {
       this.handle(event)
       if (this.menu) return // nothing else runs after Game Over or the results; the music plays on underneath
@@ -162,6 +173,16 @@ export class LevelScene extends Phaser.Scene {
     const time = this.clock.songTime()
     this.current?.game.update(time)
     this.drawCountdown(time)
+  }
+
+  // Hands the SFX track's upcoming cues to the audio clock, which plays each one exactly on its song time.
+  private scheduleSfx(): void {
+    if (!this.level) return
+    const cues = this.level.sfx
+    for (const i of dueCues(cues, this.scheduledSfx, this.clock.songTime(), hash => this.sounds.get(hash)?.duration)) {
+      const cue = cues[i]
+      if (this.clock.playSfx(this.sounds.get(cue.soundHash)!, cue.at, 1, 0, cue.volume)) this.scheduledSfx.add(i)
+    }
   }
 
   private handle(event: RunnerEvent): void {

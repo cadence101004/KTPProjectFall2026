@@ -67,24 +67,34 @@ export class AudioClock {
     return this.ctx.decodeAudioData(await response.arrayBuffer())
   }
 
+  // Decodes one of the player's own sound files (from the SFX track) for playSfx.
+  async decode(file: Blob): Promise<AudioBuffer> {
+    return this.ctx.decodeAudioData(await file.arrayBuffer())
+  }
+
   // Plays a sound effect at a song time, scheduled on the music's own clock so it lands exactly in sync.
-  // If that time has already passed it joins partway through. `rate` changes speed (and pitch).
+  // If that time has already passed it joins partway through. `rate` changes speed (and pitch), and
+  // `volume` runs 0 (silent) to 1 (as recorded).
   // No latency correction needed: the sound effect and the music reach the player's ears equally late.
-  playSfx(buffer: AudioBuffer, songTime: number, rate = 1, fileOffset = 0): void {
-    if (!this.source) return
+  // Returns false (and plays nothing) while the song isn't playing.
+  playSfx(buffer: AudioBuffer, songTime: number, rate = 1, fileOffset = 0, volume = 1): boolean {
+    if (!this.source) return false
     let when = this.startedAt + (songTime - this.startOffset)
     if (when < this.ctx.currentTime) {
       fileOffset += (this.ctx.currentTime - when) * rate
       when = this.ctx.currentTime
     }
-    if (fileOffset >= buffer.duration) return
+    if (fileOffset >= buffer.duration) return true // already over: nothing left to play
     const sound = this.ctx.createBufferSource()
     sound.buffer = buffer
     sound.playbackRate.value = rate
-    sound.connect(this.ctx.destination)
+    const gain = this.ctx.createGain()
+    gain.gain.value = volume
+    sound.connect(gain).connect(this.ctx.destination)
     sound.start(when, fileOffset)
     sound.onended = () => this.sfx.delete(sound)
     this.sfx.add(sound)
+    return true
   }
 
   // Stops playback and freezes songTime where the song stopped, so play(songTime()) resumes it.

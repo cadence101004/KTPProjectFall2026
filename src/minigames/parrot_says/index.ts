@@ -2,10 +2,11 @@
 // in a row of slots), and the player repeats each one on the beat CALL_BEATS later. Graded like every rhythm
 // game; the wrong arrow or bad timing is a miss, and a quarter or more missed knocks the pirate out. From
 // difficulty 2 the arrows vanish from the slots a beat after each call, so the sequence must be remembered.
-// Spec in MINIGAMES.md. The parrot is placeholder shapes until it has art; the pirate is Cadence's.
+// Spec in MINIGAMES.md. The parrot, the pirate, and the ship deck background are Cadence's.
 import type Phaser from 'phaser'
 import type { GameInput, HitGrade, MiniGame, MiniGameParams, Status, TaskMeta } from '../../types/minigame'
 import { addArrow, ARROW_ANGLES, type Direction, directionGrade } from '../shared/arrows'
+import { addBackdrop, loadBackdrop } from '../shared/backdrop'
 import { DEATH_FREEZE, deathLift } from '../shared/deathFall'
 import { textStyle } from '../shared/font'
 import { HIT_WINDOW, judgePress, tooManyMisses, windowScaleFor } from '../shared/judgePress'
@@ -17,8 +18,12 @@ import { arrowShowing, callTimes, groupOf, pickArrows } from './calls'
 const PIRATE = 'parrot_says_pirate'
 const JUMP = 'parrot_says_jump' // the front jump pose: answering up, and the death fall
 const PUNCH = 'parrot_says_punch' // the punch with impact lines: answering left or right (faces right)
+const CROUCH = 'parrot_says_crouch' // answering down
+const PARROT_IDLE = 'parrot_says_parrot_idle'
+const PARROT_SQUAWK = 'parrot_says_parrot_squawk' // leaning in to call an arrow
+const PARROT_FLAP = ['parrot_says_parrot_flap1', 'parrot_says_parrot_flap2'] // celebrating a win
+const FLAP_TIME = 0.12 // seconds per wing flap
 
-const SKY_COLOR = 0x7cc6e8
 const DECK_COLOR = 0x7a4d24
 const PERCH_COLOR = 0x5c3a1a
 const MAX_SLOTS = 8 // the most answers one cycle can show
@@ -37,7 +42,7 @@ export class ParrotSaysGame implements MiniGame {
     kind: 'task',
     prompt: 'REPEAT!',
     hint: 'ARROWS',
-    canHideBackground: true, // a sky over the deck: hide it to put a level video behind the parrot
+    canHideBackground: true, // the painted ship deck: hide it to put a level video behind the parrot
     baseBeats: 8,
     defaultHits: [4, 5, 6, 7], // the parrot calls on beats 1 to 4, and the player answers on beats 5 to 8
   }
@@ -53,9 +58,10 @@ export class ParrotSaysGame implements MiniGame {
   private misses = 0
   private lastAnswer: { at: number; direction: Direction | null } | null = null // for the pirate's pose; null direction = a miss
   private pirateScale = 1
+  private crouchScale = 1 // the crouch art is drawn bigger, so it's scaled to match her width
   private diedAt: number | null = null
   private objects: Phaser.GameObjects.GameObject[] = [] // everything added to the scene, for destroy()
-  private parrot!: Phaser.GameObjects.Container
+  private parrot!: Phaser.GameObjects.Image
   private bubble!: Phaser.GameObjects.Rectangle
   private bubbleArrow!: Phaser.GameObjects.Triangle
   private slots: Slot[] = []
@@ -68,9 +74,15 @@ export class ParrotSaysGame implements MiniGame {
     load.image(PIRATE, '/assets/sprites/idle_character/pirate.png')
     load.image(JUMP, '/assets/sprites/jumping_character/jumpingforwards.png')
     load.image(PUNCH, '/assets/sprites/punching_character/punch3.png')
+    load.image(CROUCH, '/assets/sprites/crouching_character/Crouch2.png')
+    load.image(PARROT_IDLE, '/assets/sprites/parrot/parrot1.png')
+    load.image(PARROT_SQUAWK, '/assets/sprites/parrot/parrot2.png')
+    load.image(PARROT_FLAP[0], '/assets/sprites/parrot/parrot3.png')
+    load.image(PARROT_FLAP[1], '/assets/sprites/parrot/parrot4.png')
+    loadBackdrop(load, 'deck')
   }
 
-  // Plans the arrows and their calls, then builds the sky, deck, perch, parrot, bubble, slots, and pirate.
+  // Plans the arrows and their calls, then builds the deck, perch, parrot, bubble, slots, and pirate.
   start(params: MiniGameParams): void {
     this.params = params
     const beatLength = 60 / params.bpm
@@ -87,10 +99,11 @@ export class ParrotSaysGame implements MiniGame {
       return object
     }
 
-    // Background layer (the sky), skipped when the level turns it off. Everything after is the foreground.
+    // Background layer: Cadence's ship deck, floor included. When the level hides it (to show a video), a
+    // plain deck floor is drawn instead so the pirate and perch still stand on something.
     const groundTop = Math.round(height * 0.8)
-    if (params.background) add(scene.add.rectangle(width / 2, groundTop / 2, width, groundTop, SKY_COLOR))
-    add(scene.add.rectangle(width / 2, (groundTop + height) / 2, width, height - groundTop, DECK_COLOR))
+    if (params.background) add(addBackdrop(scene, 'deck'))
+    else add(scene.add.rectangle(width / 2, (groundTop + height) / 2, width, height - groundTop, DECK_COLOR))
 
     // The parrot's perch: a post up from the deck with a bar across the top.
     const parrotX = width * 0.26
@@ -98,22 +111,14 @@ export class ParrotSaysGame implements MiniGame {
     add(scene.add.rectangle(parrotX, (perchY + groundTop) / 2, u(scene, 5), groundTop - perchY, PERCH_COLOR))
     add(scene.add.rectangle(parrotX, perchY, width * 0.16, u(scene, 6), PERCH_COLOR))
 
-    // A placeholder parrot from shapes, grouped so it bobs as one: body, head, beak, eye, and tail.
-    const s = height * 0.01 // one parrot unit
-    this.parrotY = perchY - 9 * s
-    this.parrot = add(
-      scene.add.container(parrotX, this.parrotY, [
-        scene.add.rectangle(-4 * s, 8 * s, 4 * s, 9 * s, 0x2a7de1), // tail
-        scene.add.ellipse(0, 0, 10 * s, 16 * s, 0x2fbf5a), // body
-        scene.add.circle(1 * s, -9 * s, 6 * s, 0x34d06a), // head
-        scene.add.triangle(6 * s, -10 * s, 0, 0, 0, 4 * s, 4 * s, 3 * s, 0xffa62b), // beak
-        scene.add.circle(3 * s, -11 * s, 1.3 * s, 0x111111), // eye
-      ]),
-    )
+    // The parrot on the perch, anchored at its feet and facing the pirate (the art faces right).
+    this.parrotY = perchY - u(scene, 2)
+    this.parrot = add(scene.add.image(parrotX, this.parrotY, PARROT_IDLE).setOrigin(0.5, 1))
+    this.parrot.setScale((height * 0.24) / this.parrot.height)
 
     // The speech bubble, up and to the right of the parrot, showing each arrow as it's squawked.
     const bubbleX = parrotX + width * 0.11
-    const bubbleY = this.parrotY - height * 0.24
+    const bubbleY = this.parrotY - height * 0.34
     this.bubble = add(scene.add.rectangle(bubbleX, bubbleY, height * 0.14, height * 0.14, 0xffffff).setStrokeStyle(u(scene, 2), 0x222222))
     this.bubbleArrow = add(addArrow(scene, bubbleX, bubbleY, height * 0.04, 0x222222))
 
@@ -130,6 +135,7 @@ export class ParrotSaysGame implements MiniGame {
     this.pirate = add(scene.add.image(width * 0.74, this.feetY, PIRATE).setOrigin(0.5, 1))
     this.pirateScale = (height * 0.36) / this.pirate.height
     this.pirate.setScale(this.pirateScale)
+    this.crouchScale = (this.pirate.displayWidth * 1.1) / scene.textures.get(CROUCH).getSourceImage().width
 
     this.label = add(scene.add.text(width / 2, height * 0.06, '', textStyle(Math.round(height * 0.055))).setOrigin(0.5))
     if (this.hits.length === 0) this.result = 'won' // an empty beat map has nothing to miss
@@ -190,8 +196,11 @@ export class ParrotSaysGame implements MiniGame {
     const squawking = squawk >= 0 && songTime - this.calls[squawk] < SQUAWK_SHOW * beatLength && this.result !== 'failed'
     this.bubble.setVisible(squawking)
     this.bubbleArrow.setVisible(squawking).setAngle(ARROW_ANGLES[this.arrows[Math.max(0, squawk)] ?? 'right'])
+    // The parrot leans in and hops a little on each squawk, and flaps its wings once the game is won.
     const bob = squawking ? 1 - (songTime - this.calls[squawk]) / (SQUAWK_SHOW * beatLength) : 0
-    this.parrot.setY(this.parrotY - bob * height * 0.03).setScale(1 + bob * 0.08)
+    const flapping = this.result === 'won'
+    this.parrot.setTexture(flapping ? PARROT_FLAP[Math.floor(songTime / FLAP_TIME) % 2] : squawking ? PARROT_SQUAWK : PARROT_IDLE)
+    this.parrot.setY(this.parrotY - (flapping ? height * 0.04 : bob * height * 0.03))
 
     // The slots show the group (cycle) the next answer is in, or the last group once everything's answered.
     const cycleLength = this.meta.baseBeats * beatLength
@@ -225,7 +234,7 @@ export class ParrotSaysGame implements MiniGame {
   }
 
   // The pirate acts out each correct answer for POSE_TIME: up jumps, left and right punch that way (the punch
-  // art faces right, so left is mirrored), and down ducks (a squash, until there's crouch art). A miss gets a
+  // art faces right, so left is mirrored), and down crouches. A miss gets a
   // red flinch instead. Once knocked out, she does the shared death fall.
   private drawPirate(songTime: number): void {
     const height = this.params.scene.scale.height
@@ -242,9 +251,9 @@ export class ParrotSaysGame implements MiniGame {
     const move = posing && pose!.direction
 
     this.pirate.setTint(posing && !move ? 0xff8a8a : 0xffffff) // a miss: a red flinch, no pose
-    this.pirate.setTexture(move === 'up' ? JUMP : move === 'left' || move === 'right' ? PUNCH : PIRATE)
+    this.pirate.setTexture(move === 'up' ? JUMP : move === 'left' || move === 'right' ? PUNCH : move === 'down' ? CROUCH : PIRATE)
     this.pirate.setFlipX(move === 'left')
-    this.pirate.setScale(this.pirateScale * (move === 'down' ? 1 + 0.12 * arc : 1), this.pirateScale * (move === 'down' ? 1 - 0.18 * arc : 1))
+    this.pirate.setScale(move === 'down' ? this.crouchScale : this.pirateScale)
     this.pirate.setY(this.feetY - (move === 'up' ? arc * height * 0.1 : 0))
   }
 }

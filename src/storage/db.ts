@@ -8,7 +8,8 @@ export interface LevelRecord {
   updatedAt: number // ms since epoch, for sorting the level list
 }
 
-// A stored file, keyed by its SHA-256 hash: a song (a level's audioHash) or a media file (a mediaHash).
+// A stored file, keyed by its SHA-256 hash: a song (a level's audioHash), a media file (a mediaHash), or a
+// sound effect (an SfxCue's soundHash).
 interface FileRecord {
   hash: string
   name: string // original file name, shown to the user
@@ -19,17 +20,20 @@ interface PirateWareDB extends DBSchema {
   levels: { key: string; value: LevelRecord }
   songs: { key: string; value: FileRecord }
   media: { key: string; value: FileRecord }
+  sounds: { key: string; value: FileRecord }
 }
 
 // Everything is stored in the player's own browser. Each song or media file is stored once per hash,
-// however many levels use it. Version 2 added the media store; upgrading keeps existing levels and songs.
-const db = openDB<PirateWareDB>('pirateware', 2, {
+// however many levels use it. Version 2 added the media store and version 3 the sounds store; upgrading
+// keeps everything already saved.
+const db = openDB<PirateWareDB>('pirateware', 3, {
   upgrade(database, oldVersion) {
     if (oldVersion < 1) {
       database.createObjectStore('levels', { keyPath: 'id' })
       database.createObjectStore('songs', { keyPath: 'hash' })
     }
     if (oldVersion < 2) database.createObjectStore('media', { keyPath: 'hash' })
+    if (oldVersion < 3) database.createObjectStore('sounds', { keyPath: 'hash' })
   },
 })
 
@@ -66,4 +70,12 @@ export async function saveMedia(hash: string, name: string, file: Blob): Promise
 
 export async function loadMedia(hash: string): Promise<{ name: string; file: Blob } | null> {
   return (await (await db).get('media', hash)) ?? null
+}
+
+export async function saveSound(hash: string, name: string, file: Blob): Promise<void> {
+  await (await db).put('sounds', { hash, name, file })
+}
+
+export async function loadSound(hash: string): Promise<{ name: string; file: Blob } | null> {
+  return (await (await db).get('sounds', hash)) ?? null
 }

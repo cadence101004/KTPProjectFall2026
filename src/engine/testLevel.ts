@@ -16,4 +16,5 @@ export const testLevel: Level = {
     { type: 'buffer', start: 22, end: 24 },
   ],
   media: [],
+  sfx: [],
 }
